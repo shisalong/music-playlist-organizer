@@ -10,6 +10,7 @@ let songGraph = null;
 let playlistGenerator = null;
 const playlist = new DSA.CircularQueue(100);
 const SAVED_PLAYLISTS_STORAGE_KEY = 'genmixSavedPlaylists';
+const SONG_CSV_FILE = 'songs_deduped.csv';
 const RECOMMENDATION_COUNT = 12;
 const LOADING_DURATION_MS = 2500;
 const GENERATION_SAFETY_TIMEOUT_MS = 10000;
@@ -31,7 +32,7 @@ let generationInProgress = false;
 let loadingMessageInterval = null;
 let activeSection = 'home';
 let previousBodyOverflow = '';
-let catalogLoadMessage = 'Song library is empty. Could not load songs_cleaned.csv.';
+let catalogLoadMessage = `Song library is empty. Could not load ${SONG_CSV_FILE}.`;
 let youtubeAuth = null;
 let youtubeExportUI = null;
 const GENERATOR_SEARCH_LIMIT = 30;
@@ -46,9 +47,9 @@ const GENERATOR_FEATURES = [
 // Load the catalog dataset without adding its songs to playback or recommendations.
 async function loadCSVSongs() {
     try {
-        const response = await fetch('songs_cleaned.csv');
+        const response = await fetch(SONG_CSV_FILE);
         if (!response.ok) {
-            throw new Error(`Could not load songs_cleaned.csv: ${response.status}`);
+            throw new Error(`Could not load ${SONG_CSV_FILE}: ${response.status}`);
         }
 
         const csvText = await response.text();
@@ -61,7 +62,7 @@ async function loadCSVSongs() {
         window.playlistGenerator = playlistGenerator;
         updateGeneratorAvailability();
         if (songCatalog.size === 0 || songGraph.nodeCount() === 0) {
-            catalogLoadMessage = 'Song library is empty. No usable songs were loaded from songs_cleaned.csv.';
+            catalogLoadMessage = `Song library is empty. No usable songs were loaded from ${SONG_CSV_FILE}.`;
             console.warn(catalogLoadMessage);
         } else {
             catalogLoadMessage = '';
@@ -74,10 +75,10 @@ async function loadCSVSongs() {
     } catch (error) {
         console.error('Failed to load the song CSV:', error);
         updateGeneratorAvailability();
-        catalogLoadMessage = 'Song library is empty. Could not load songs_cleaned.csv.';
+        catalogLoadMessage = `Song library is empty. Could not load ${SONG_CSV_FILE}.`;
         renderHome();
         updateLibraryDisplay();
-        showNotification('Could not load songs_cleaned.csv.', 'error');
+        showNotification(`Could not load ${SONG_CSV_FILE}.`, 'error');
     }
 }
 
@@ -1256,8 +1257,10 @@ function renderPlaylistDetail() {
     document.getElementById('playlistAddSongsToggle').disabled = false;
     document.getElementById('playlistDetailName').textContent = savedPlaylist.name;
     const songCount = savedPlaylist.songs.length;
+    const missingCount = savedPlaylist.songs.filter(isMissingFromCatalog).length;
     document.getElementById('playlistDetailCount').textContent =
-        `${songCount} song${songCount === 1 ? '' : 's'}`;
+        `${songCount} song${songCount === 1 ? '' : 's'}` +
+        (missingCount > 0 ? ` · ${missingCount} not in the current song catalog` : '');
 
     if (songCount === 0) {
         const emptyState = document.createElement('li');
@@ -1274,7 +1277,8 @@ function renderPlaylistDetail() {
 }
 
 // Build one draggable song row with move up/down and remove controls.
-function renderPlaylistSongRow(song, index, songCount) {
+function renderPlaylistSongRow(savedSong, index, songCount) {
+    const song = savedSong && typeof savedSong === 'object' ? savedSong : {};
     const title = song.title || song.track_name || 'Untitled';
     const row = document.createElement('li');
     row.className = 'playlist-song-row';
@@ -1301,6 +1305,13 @@ function renderPlaylistSongRow(song, index, songCount) {
     artistText.textContent = song.artist || song.artists || 'Unknown artist';
     info.appendChild(titleText);
     info.appendChild(artistText);
+    if (isMissingFromCatalog(song)) {
+        row.classList.add('playlist-song-missing');
+        const missingNote = document.createElement('span');
+        missingNote.className = 'playlist-song-missing-note';
+        missingNote.textContent = 'Not in the current song catalog';
+        info.appendChild(missingNote);
+    }
     row.appendChild(info);
 
     const actions = document.createElement('div');
@@ -1358,6 +1369,15 @@ function renderPlaylistSongRow(song, index, songCount) {
         });
     });
     return row;
+}
+
+// Flag a saved song whose track ID is absent from the loaded catalog; saved copies still display.
+function isMissingFromCatalog(song) {
+    if (songCatalog.size === 0) {
+        return false;
+    }
+    const trackId = PlaylistEditor.getTrackId(song);
+    return trackId === '' || songCatalog.search(trackId) === null;
 }
 
 // Persist a pure edit result and refresh every view that shows the playlist.

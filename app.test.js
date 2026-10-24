@@ -322,7 +322,7 @@ async function main() {
         assertEqual(app.evaluate('songCatalog.size'), 0, 'Failed load must leave the catalog empty');
         assertEqual(app.evaluate('songIndex.songs.length'), 0, 'Failed load must leave the sorted index empty');
         assert(
-            app.elements.get('libraryStatus').textContent.includes('Could not load songs_cleaned.csv'),
+            app.elements.get('libraryStatus').textContent.includes('Could not load songs_deduped.csv'),
             'Failed load should explain the empty library in Library'
         );
         assert(app.elements.get('wizardSongMethod').disabled, 'Failed CSV load should disable song generation');
@@ -332,7 +332,7 @@ async function main() {
     });
 
     await runTest('real CSV startup contains only source records and preserves legitimate title collisions', async () => {
-        const csvText = fs.readFileSync(path.join(__dirname, 'songs_cleaned.csv'), 'utf8');
+        const csvText = fs.readFileSync(path.join(__dirname, 'songs_deduped.csv'), 'utf8');
         const app = createApp(async () => csvResponse(csvText));
         await app.startup();
         const sourceTree = new DSA.BTree();
@@ -341,7 +341,7 @@ async function main() {
             sourceTree.inorderTraversal().map((song) => song.track_id)
         );
         const catalogSongs = app.evaluate('songCatalog.inorderTraversal()');
-        assertEqual(catalogSongs.length, 5000, 'App should retain the existing 5,000-row CSV limit');
+        assertEqual(catalogSongs.length, 4428, 'App should load every unique song in songs_deduped.csv');
         assert(
             catalogSongs.every((song) => sourceIds.has(song.track_id)),
             'Every startup catalog song ID must be present in the source CSV'
@@ -468,7 +468,7 @@ async function main() {
     });
 
     await runTest('saved queue playlists render in Home and Library and persist across app reloads', async () => {
-        const csvText = fs.readFileSync(path.join(__dirname, 'songs_cleaned.csv'), 'utf8');
+        const csvText = fs.readFileSync(path.join(__dirname, 'songs_deduped.csv'), 'utf8');
         const storage = createMemoryStorage();
         const app = createApp(async () => csvResponse(csvText), storage);
         await app.startup();
@@ -514,7 +514,7 @@ async function main() {
     });
 
     await runTest('generated playlists save once, refresh Home and Library, and persist', async () => {
-        const csvText = fs.readFileSync(path.join(__dirname, 'songs_cleaned.csv'), 'utf8');
+        const csvText = fs.readFileSync(path.join(__dirname, 'songs_deduped.csv'), 'utf8');
         const storage = createMemoryStorage();
         const existingPlaylist = {
             id: 'preexisting',
@@ -585,8 +585,44 @@ async function main() {
         );
     });
 
+    await runTest('saved playlists with songs missing from the dataset still open and edit', async () => {
+        const csvText = fs.readFileSync(path.join(__dirname, 'songs_deduped.csv'), 'utf8');
+        const sourceTree = new DSA.BTree();
+        DSA.loadSongsFromCSV(csvText, sourceTree);
+        const realSong = sourceTree.inorderTraversal()[0];
+        const storage = createMemoryStorage();
+        storage.setItem('genmixSavedPlaylists', JSON.stringify([{
+            id: 'legacy',
+            name: 'Legacy Mix',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            songs: [
+                { ...realSong },
+                { track_id: 'removed-from-dataset', title: 'Old Song', artist: 'Old Artist' },
+                null
+            ]
+        }]));
+        const app = createApp(async () => csvResponse(csvText), storage);
+        await app.startup();
+
+        assert(app.context.openPlaylistDetail('legacy'), 'A playlist with missing songs should still open');
+        const rows = app.elements.get('playlistDetailSongs').children;
+        assertEqual(rows.length, 3, 'Every saved entry should still render as a row');
+        assert(!rows[0].classList.contains('playlist-song-missing'), 'A catalog song should not be flagged');
+        assert(rows[1].classList.contains('playlist-song-missing'), 'A song absent from the dataset should be flagged');
+        assert(rows[2].classList.contains('playlist-song-missing'), 'A malformed entry should be flagged, not crash');
+        assert(
+            app.elements.get('playlistDetailCount').textContent.includes('2 not in the current song catalog'),
+            'The header should report how many songs are missing'
+        );
+
+        assert(app.context.removeSongFromOpenPlaylist(1), 'Missing songs should remain removable');
+        const saved = JSON.parse(storage.getItem('genmixSavedPlaylists'))[0];
+        assertEqual(saved.songs.length, 2, 'The removal should persist');
+        assertEqual(saved.songs[0].track_id, realSong.track_id, 'Remaining songs should keep their order');
+    });
+
     await runTest('Delete discards results and empty or failed generation is recoverable', async () => {
-        const csvText = fs.readFileSync(path.join(__dirname, 'songs_cleaned.csv'), 'utf8');
+        const csvText = fs.readFileSync(path.join(__dirname, 'songs_deduped.csv'), 'utf8');
         const storage = createMemoryStorage();
         const app = createApp(async () => csvResponse(csvText), storage);
         await app.startup();

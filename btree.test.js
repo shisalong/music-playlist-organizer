@@ -190,14 +190,18 @@ runTest('CSV loader reports duplicates, skips empty IDs, and defaults invalid nu
     assert(tree.validate(), 'Loader output should satisfy B-Tree invariants');
 });
 
-const csvPath = path.join(__dirname, 'songs_cleaned.csv');
+const csvPath = path.join(__dirname, 'songs_deduped.csv');
+const DEDUPED_CSV_SONG_COUNT = 4428;
 if (fs.existsSync(csvPath)) {
     runTest('real CSV loads up to the configured limit and validates', () => {
         const csvText = fs.readFileSync(csvPath, 'utf8');
         const tree = new BTree();
         const stats = loadSongsFromCSV(csvText, tree);
 
-        assertEqual(stats.rowsRead, SONG_LIMIT, 'Loader should process the configured row limit');
+        assert(DEDUPED_CSV_SONG_COUNT <= SONG_LIMIT, 'The deduplicated CSV should fit within the row limit');
+        assertEqual(stats.rowsRead, DEDUPED_CSV_SONG_COUNT, 'Loader should process every deduplicated data row');
+        assertEqual(stats.songsInserted, DEDUPED_CSV_SONG_COUNT, 'Every deduplicated row should be inserted');
+        assertEqual(stats.duplicatesSkipped, 0, 'The deduplicated CSV should contain no repeated track IDs');
         assertEqual(
             stats.songsInserted + stats.duplicatesSkipped + stats.skippedRows,
             stats.rowsRead,
@@ -207,7 +211,7 @@ if (fs.existsSync(csvPath)) {
         assert(tree.validate(), 'CSV-loaded tree must pass validation');
     });
 } else {
-    console.log('SKIP: real CSV load — songs_cleaned.csv is not present');
+    console.log('SKIP: real CSV load — songs_deduped.csv is not present');
 }
 
 runTest('binary search finds several existing IDs in a sorted array', () => {
@@ -324,15 +328,15 @@ runTest('binary search matches B-Tree for 5,000 shuffled synthetic songs', () =>
     }
 });
 
-const binarySearchCsvPath = path.join(__dirname, 'songs_cleaned.csv');
+const binarySearchCsvPath = path.join(__dirname, 'songs_deduped.csv');
 if (fs.existsSync(binarySearchCsvPath)) {
-    runTest('binary search matches B-Tree for the first 5,000 real CSV rows', () => {
+    runTest('binary search matches B-Tree for every real CSV row', () => {
         const csvText = fs.readFileSync(binarySearchCsvPath, 'utf8');
         const tree = new BTree();
         const stats = loadSongsFromCSV(csvText, tree);
         const songIndex = new SortedSongIndex(tree);
 
-        assertEqual(stats.rowsRead, SONG_LIMIT, 'Loader should process configured CSV limit');
+        assertEqual(stats.rowsRead, DEDUPED_CSV_SONG_COUNT, 'Loader should process every deduplicated CSV row');
         assertEqual(songIndex.songs.length, tree.size, 'Sorted array length should match tree size');
         assert(isSortedByTrackId(songIndex.songs), 'CSV index should be sorted');
         songIndex.songs.forEach((song) => {
@@ -348,7 +352,7 @@ if (fs.existsSync(binarySearchCsvPath)) {
         });
     });
 } else {
-    console.log('SKIP: binary search real CSV comparison — songs_cleaned.csv is not present');
+    console.log('SKIP: binary search real CSV comparison — songs_deduped.csv is not present');
 }
 
 console.log(`\nTest summary: ${passed} passed, ${failed} failed`);

@@ -778,6 +778,20 @@ select:focus-visible {
     overflow-wrap: anywhere;
 }
 
+.playlist-song-missing {
+    border-style: dashed;
+}
+
+.playlist-song-missing .playlist-song-title {
+    color: var(--text-secondary);
+}
+
+.playlist-song-missing-note {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    font-style: italic;
+}
+
 .playlist-song-actions {
     display: flex;
     gap: 4px;
