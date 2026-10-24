@@ -126,7 +126,7 @@
 }
 
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg-primary);
     color: var(--text-primary);
     line-height: 1.5;
@@ -245,12 +245,59 @@ select:focus-visible {
     z-index: 2;
 }
 
-.header-wordmark,
-.menu-brand {
+.header-wordmark {
     color: var(--text-primary);
-    font-size: 22px;
-    font-weight: 800;
-    letter-spacing: 0.02em;
+    font-family: 'Unbounded', 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
+
+/* Form controls do not inherit the page font by default. */
+button,
+input,
+select,
+textarea {
+    font-family: inherit;
+}
+
+/* Reusable animated gradient text; override --gt-colors and --gt-speed for variants. */
+.gradient-text {
+    --gt-colors: #fffaf0, #f3e2bd, #d9b878, #fbf3df, #fffaf0;
+    --gt-speed: 8s;
+    --gt-glow: rgba(243, 226, 189, 0.35);
+    display: inline-block;
+    color: #f3e2bd;
+    background-image: linear-gradient(110deg, var(--gt-colors));
+    background-size: 250% 100%;
+    background-position: 0% 50%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 8px var(--gt-glow));
+    animation: gradientTextShift var(--gt-speed) ease-in-out infinite alternate;
+}
+
+.gradient-text--vivid {
+    --gt-colors: #fffdf6, #f7dfa6, #e6bf6e, #fff3d6, #f0c97a, #fffdf6;
+    --gt-speed: 3.5s;
+    --gt-glow: rgba(247, 223, 166, 0.5);
+}
+
+@keyframes gradientTextShift {
+    from {
+        background-position: 0% 50%;
+    }
+    to {
+        background-position: 100% 50%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gradient-text {
+        animation: none;
+    }
 }
 
 .menu-toggle {
@@ -324,7 +371,7 @@ select:focus-visible {
     width: min(290px, 85vw);
     height: 100vh;
     height: 100dvh;
-    padding: 28px 18px;
+    padding: 84px 18px 28px;
     overflow-y: auto;
     background: var(--bg-solid-fallback);
     border-right: 1px solid var(--border-subtle);
@@ -338,10 +385,6 @@ select:focus-visible {
     transform: translateX(0);
     visibility: visible;
     transition: transform var(--menu-transition), visibility 0s;
-}
-
-.menu-brand {
-    padding: 8px 10px 28px;
 }
 
 .menu-panel .nav-item {
@@ -910,6 +953,21 @@ select:focus-visible {
     font-size: 32px;
     font-weight: 700;
     margin-bottom: 0;
+}
+
+/* Centered generator title; a fixed line box keeps the steps below in place. */
+.generator-header {
+    justify-content: center;
+    text-align: center;
+}
+
+.section-header .generator-title {
+    font-family: 'Unbounded', 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+    font-size: clamp(26px, 2.8vw, 36px);
+    font-weight: 700;
+    line-height: 1.25;
+    white-space: nowrap;
+    max-width: 100%;
 }
 
 .section-actions {

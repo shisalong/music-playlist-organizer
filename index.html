@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="GenMix is a music catalog and playlist organizer built with data structures and algorithms.">
     <title>GenMix</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+    <!-- Bump the version query after style changes so browsers do not reuse a cached stylesheet. -->
+    <link rel="stylesheet" href="styles.css?v=3">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Unbounded:wght@600;700;800&display=swap">
 </head>
 <body>
     <!-- Keep the menu button outside the content that blurs when the menu opens. -->
@@ -27,7 +30,7 @@
 
     <!-- Keep the brand and catalog search visible in the page header. -->
     <header id="appHeader" class="top-bar">
-        <span class="header-wordmark">GenMix</span>
+        <span class="header-wordmark gradient-text">GenMix</span>
         <div class="search-container">
             <button class="search-btn" type="button" aria-label="Search songs">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -50,7 +53,6 @@
 
     <!-- The navigation panel stays mounted so its slide transition can finish. -->
     <aside id="mainMenu" class="menu-panel" aria-label="Main menu" aria-hidden="true" inert>
-        <div class="menu-brand">GenMix</div>
         <nav class="sidebar-nav" aria-label="Primary navigation">
             <a href="#homeSection" class="nav-item active" data-section="home" aria-current="page">
                 <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -188,9 +190,9 @@
 
             <!-- Playlist Generator Section -->
             <section id="generatorSection" class="content-section">
-                <div class="section-header">
+                <div class="section-header generator-header">
                     <div>
-                        <h1>Playlist Generator</h1>
+                        <h1 class="generator-title gradient-text gradient-text--vivid">Playlist Generator</h1>
                         <p class="generator-intro">Build a playlist from a seed song or a mood.</p>
                     </div>
                 </div>
