@@ -219,7 +219,7 @@ npm run dev    # Start development server
 ```
 
 ### Access
-Open browser at `http://localhost:3000`
+Open browser at `http://localhost:3010`
 
 ---
 

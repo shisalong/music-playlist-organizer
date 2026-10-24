@@ -230,12 +230,12 @@ Run generator, UI helper, and wizard helper tests with `node playlistGenerator.t
    ```
 
 4. **Open in browser**
-   - The application will automatically open at `http://localhost:3000`
+   - The application will automatically open at `http://localhost:3010`
    - Or manually navigate to the provided URL
 
    Run all standalone suites with:
    ```bash
-   node btree.test.js && node graph.test.js && node playlistGenerator.test.js && node playlistUI.test.js && node playlistWizard.test.js && node app.test.js
+   npm test
    ```
 
 ### Usage
@@ -255,6 +255,14 @@ Run generator, UI helper, and wizard helper tests with `node playlistGenerator.t
 2. Choose **Create Playlist**, enter a name, then select **Pick a Song** or **Pick a Mood**
 3. Select a catalog seed or one of the exported moods and generate the playlist
 4. Choose **Save to Library** to keep it, or **Delete Playlist** to discard it without saving
+
+#### Exporting to YouTube
+1. Complete the one-time Google Cloud and local configuration in [docs/YOUTUBE_EXPORT_SETUP.md](docs/YOUTUBE_EXPORT_SETUP.md)
+2. Generate a playlist or use **Export to YouTube** on a saved-playlist card
+3. Confirm the name, privacy, and estimated quota use, then authorize your own Google account
+4. GenMix preserves song order, reports unmatched or failed songs, and links to the created YouTube playlist
+
+OAuth tokens stay in memory only. Accepted song-to-video matches are cached separately in localStorage to reduce later YouTube searches.
 
 #### Searching Songs
 1. Type in the search box

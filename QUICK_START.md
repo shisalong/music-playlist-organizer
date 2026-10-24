@@ -19,7 +19,7 @@ npm start
 ```
 
 ## Step 3: Open in Browser
-The application will automatically open at **http://localhost:3000**
+The application will automatically open at **http://localhost:3010**
 
 The startup catalog loads up to the first 5,000 data rows from `songs_cleaned.csv` in the project root. If the file cannot be loaded or contains no usable songs, the library stays empty and displays a message; no demo songs are inserted. Run the standalone test suites with:
 

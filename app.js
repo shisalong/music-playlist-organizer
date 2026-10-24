@@ -26,6 +26,8 @@ let loadingMessageInterval = null;
 let activeSection = 'home';
 let previousBodyOverflow = '';
 let catalogLoadMessage = 'Song library is empty. Could not load songs_cleaned.csv.';
+let youtubeAuth = null;
+let youtubeExportUI = null;
 const GENERATOR_SEARCH_LIMIT = 30;
 const GENERATOR_FEATURES = [
     ['danceability', 'Danceability'],
@@ -275,6 +277,9 @@ function setupPlaylistGeneratorUI() {
     document.getElementById('wizardMoodCancel').addEventListener('click', cancelPlaylistWizard);
     document.getElementById('wizardLoadingCancel').addEventListener('click', cancelPlaylistWizard);
     document.getElementById('wizardSaveButton').addEventListener('click', saveGeneratedPlaylist);
+    document.getElementById('wizardYouTubeExport').addEventListener('click', () => {
+        openYouTubeExport({ name: wizardState.name, songs: wizardState.result && wizardState.result.songs || [] });
+    });
     document.getElementById('wizardDeleteButton').addEventListener('click', showDeleteConfirmation);
     document.getElementById('wizardDeleteConfirm').addEventListener('click', discardGeneratedPlaylist);
     document.getElementById('wizardDeleteKeep').addEventListener('click', hideDeleteConfirmation);
@@ -293,6 +298,48 @@ function setupPlaylistGeneratorUI() {
 // Bind the existing queue-save and Home recommendation controls.
 function setupPlaylistSavingUI() {
     document.getElementById('saveQueuePlaylistButton').addEventListener('click', saveCurrentQueue);
+}
+
+// Build the optional browser-only YouTube integration without blocking the core app.
+function setupYouTubeExportUI() {
+    const required = [
+        window.YouTubeAuth,
+        window.YouTubeApiClient,
+        window.YouTubeMatchCache,
+        window.YouTubeExporter,
+        window.YouTubeExportUI,
+        window.estimateYouTubeQuota
+    ];
+    if (required.some((value) => typeof value !== 'function')) {
+        console.warn('YouTube export modules are unavailable.');
+        return;
+    }
+    const configuration = window.GENMIX_CONFIG || {};
+    youtubeAuth = new window.YouTubeAuth({
+        clientId: configuration.googleClientId,
+        google: window.google
+    });
+    const cache = new window.YouTubeMatchCache(window.localStorage);
+    const api = new window.YouTubeApiClient({ auth: youtubeAuth, fetch: window.fetch || fetch });
+    const exporter = new window.YouTubeExporter({ api, cache });
+    youtubeExportUI = new window.YouTubeExportUI({
+        document,
+        exporter,
+        cache,
+        estimateQuota: window.estimateYouTubeQuota
+    });
+    youtubeExportUI.setup();
+}
+
+// Open one shared export panel and refresh the late-loading Google library reference.
+function openYouTubeExport(playlistToExport) {
+    if (!youtubeExportUI || !youtubeAuth) {
+        showNotification('YouTube export could not initialize. Refresh the page and try again.', 'error');
+        return false;
+    }
+    youtubeAuth.google = window.google;
+    youtubeExportUI.open(playlistToExport);
+    return true;
 }
 
 // Check that both the cached catalog and graph contain usable songs.
@@ -695,6 +742,8 @@ function renderGeneratedPlaylist() {
 
     const hasSongs = songs.length > 0;
     document.getElementById('wizardResultActions').hidden = !hasSongs || wizardState.saved;
+    document.getElementById('wizardExportActions').hidden = !hasSongs;
+    document.getElementById('wizardYouTubeExport').disabled = !hasSongs || !youtubeExportUI;
     document.getElementById('wizardEmptyResultActions').hidden = hasSongs;
     document.getElementById('wizardSavedActions').hidden = !wizardState.saved;
     document.getElementById('wizardDeleteConfirmation').hidden =
@@ -892,6 +941,14 @@ function renderPlaylistCard(savedPlaylist) {
     count.className = 'saved-playlist-count';
     count.textContent = `${savedPlaylist.songs.length} song${savedPlaylist.songs.length === 1 ? '' : 's'}`;
     card.appendChild(count);
+
+    const exportButton = document.createElement('button');
+    exportButton.className = 'btn-youtube saved-playlist-export';
+    exportButton.type = 'button';
+    exportButton.textContent = 'Export to YouTube';
+    exportButton.disabled = !youtubeExportUI;
+    exportButton.addEventListener('click', () => openYouTubeExport(savedPlaylist));
+    card.appendChild(exportButton);
     return card;
 }
 
@@ -1319,6 +1376,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupMenu();
     setupNavigation();
     setupPlaylistSavingUI();
+    setupYouTubeExportUI();
     setupPlaylistGeneratorUI();
     setupProgressBar();
     addVisualizationStep('GenMix initialized');

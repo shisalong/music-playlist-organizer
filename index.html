@@ -243,6 +243,9 @@
                             <button id="wizardSaveButton" class="btn-primary" type="button">Save to Library</button>
                             <button id="wizardDeleteButton" class="btn-secondary" type="button">Delete Playlist</button>
                         </div>
+                        <div id="wizardExportActions" class="wizard-actions">
+                            <button id="wizardYouTubeExport" class="btn-youtube" type="button">Export to YouTube</button>
+                        </div>
                         <div id="wizardDeleteConfirmation" class="wizard-confirmation" hidden>
                             <span>Discard this playlist?</span>
                             <button id="wizardDeleteConfirm" class="btn-secondary" type="button">Yes, discard</button>
@@ -341,10 +344,46 @@
         </div>
     </div>
 
+    <!-- Shared confirmation and result panel for generated and saved playlists. -->
+    <div id="youtubeExportModal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="youtubeExportHeading">
+        <div class="modal-content youtube-export-modal-content">
+            <div class="modal-header">
+                <h2 id="youtubeExportHeading">Export to YouTube</h2>
+                <button id="youtubeExportClose" class="modal-close" type="button" aria-label="Close YouTube export">×</button>
+            </div>
+            <div class="modal-body youtube-export-body">
+                <label for="youtubePlaylistName">Playlist name</label>
+                <input id="youtubePlaylistName" class="generator-input" type="text" maxlength="150" autocomplete="off">
+                <label for="youtubePrivacy">YouTube privacy</label>
+                <select id="youtubePrivacy" class="generator-input">
+                    <option value="private" selected>Private</option>
+                    <option value="unlisted">Unlisted</option>
+                    <option value="public">Public</option>
+                </select>
+                <p id="youtubeExportEstimate" class="youtube-export-estimate"></p>
+                <p class="youtube-export-note">You will authorize your own Google account. GenMix keeps the access token in memory only.</p>
+                <p id="youtubeExportStatus" class="wizard-message" role="status" aria-live="polite"></p>
+                <div id="youtubeExportResult" class="youtube-export-result"></div>
+                <div class="wizard-actions">
+                    <button id="youtubeExportStart" class="btn-youtube" type="button">Authorize and Export</button>
+                    <button id="youtubeExportCancel" class="btn-secondary" type="button">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.local.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="dsa.js"></script>
     <script src="playlistGenerator.js"></script>
     <script src="playlistUI.js"></script>
     <script src="playlistWizard.js"></script>
+    <script src="integrations/youtube/youtubeMatcher.js"></script>
+    <script src="integrations/youtube/youtubeCache.js"></script>
+    <script src="integrations/youtube/youtubeAuth.js"></script>
+    <script src="integrations/youtube/youtubeApi.js"></script>
+    <script src="integrations/youtube/youtubeExporter.js"></script>
+    <script src="integrations/youtube/youtubeUI.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
