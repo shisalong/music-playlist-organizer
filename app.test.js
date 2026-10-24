@@ -621,6 +621,74 @@ async function main() {
         assertEqual(saved.songs[0].track_id, realSong.track_id, 'Remaining songs should keep their order');
     });
 
+    await runTest('Library playlists can be deleted from a card or the detail view and stay deleted', async () => {
+        const csvText = fs.readFileSync(path.join(__dirname, 'songs_deduped.csv'), 'utf8');
+        const sourceTree = new DSA.BTree();
+        DSA.loadSongsFromCSV(csvText, sourceTree);
+        const [songA, songB] = sourceTree.inorderTraversal();
+        const storage = createMemoryStorage();
+        const makePlaylist = (id, name) => ({
+            id,
+            name,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            songs: [{ ...songA }, { ...songB }]
+        });
+        storage.setItem('genmixSavedPlaylists', JSON.stringify([
+            makePlaylist('keep', 'Keep Me'),
+            makePlaylist('card', 'Delete From Card'),
+            makePlaylist('detail', 'Delete From Detail')
+        ]));
+        const app = createApp(async () => csvResponse(csvText), storage);
+        await app.startup();
+        const savedIds = () => JSON.parse(storage.getItem('genmixSavedPlaylists')).map((saved) => saved.id);
+
+        app.context.switchSection('library');
+        const findCard = (name) => app.elements.get('libraryDisplay').children.find((card) => {
+            return card.children[0].textContent === name;
+        });
+        const card = findCard('Delete From Card');
+        const deleteButton = card.children.find((child) => child.textContent === 'Delete');
+        const confirmation = card.children.find((child) => child.className.includes('saved-playlist-confirm'));
+        assert(deleteButton && confirmation, 'Library cards should offer Delete with a confirmation');
+        assert(confirmation.hidden, 'The confirmation should start hidden');
+
+        deleteButton.click();
+        assert(!confirmation.hidden && deleteButton.hidden, 'Delete should ask for confirmation first');
+        confirmation.children[2].click();
+        assert(confirmation.hidden && !deleteButton.hidden, 'Cancel should close the confirmation');
+        assertEqual(savedIds(), ['keep', 'card', 'detail'], 'Cancel must not delete anything');
+
+        deleteButton.click();
+        confirmation.children[1].click();
+        assertEqual(savedIds(), ['keep', 'detail'], 'Confirming should delete only that playlist');
+        assert(!findCard('Delete From Card'), 'The deleted card should leave the Library');
+        assert(findCard('Keep Me') && findCard('Delete From Detail'), 'Other cards should remain');
+
+        assert(app.context.openPlaylistDetail('detail'), 'The detail view should open');
+        assert(app.context.removeSongFromOpenPlaylist(0), 'A song removal should offer undo');
+        assert(!app.elements.get('undoToast').hidden, 'The undo toast should be visible');
+        app.elements.get('playlistDeleteButton').click();
+        assert(!app.elements.get('playlistDeleteConfirmation').hidden, 'Detail delete should ask for confirmation');
+        app.elements.get('playlistDeleteConfirm').click();
+        assertEqual(savedIds(), ['keep'], 'Confirming in the detail view should delete the open playlist');
+        assertEqual(app.evaluate('activeSection'), 'library', 'Deleting the open playlist should return to the Library');
+        assertEqual(app.evaluate('openPlaylistId'), null, 'No deleted playlist should stay open');
+        assert(app.elements.get('undoToast').hidden, 'A pending undo for the deleted playlist should be dismissed');
+        assertEqual(app.evaluate('pendingUndo'), null, 'The stale undo should be cleared');
+        assert(!app.context.openPlaylistDetail('detail'), 'A deleted playlist should not reopen');
+
+        const reloadedApp = createApp(async () => csvResponse(csvText), storage);
+        await reloadedApp.startup();
+        reloadedApp.context.switchSection('library');
+        const reloadedNames = reloadedApp.elements.get('libraryDisplay').children.map((saved) => saved.children[0].textContent);
+        assertEqual(reloadedNames, ['Keep Me'], 'Deletions should persist across a reload');
+        assertEqual(
+            reloadedApp.elements.get('homePlaylistsDisplay').children.map((saved) => saved.children[0].textContent),
+            ['Keep Me'],
+            'Home should also stop listing deleted playlists'
+        );
+    });
+
     await runTest('Delete discards results and empty or failed generation is recoverable', async () => {
         const csvText = fs.readFileSync(path.join(__dirname, 'songs_deduped.csv'), 'utf8');
         const storage = createMemoryStorage();

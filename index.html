@@ -6,12 +6,26 @@
     <meta name="description" content="GenMix is a music catalog and playlist organizer built with data structures and algorithms.">
     <title>GenMix</title>
     <!-- Bump the version query after style changes so browsers do not reuse a cached stylesheet. -->
-    <link rel="stylesheet" href="styles.css?v=3">
+    <link rel="stylesheet" href="styles.css?v=7">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Unbounded:wght@600;700;800&display=swap">
 </head>
 <body>
+    <!-- Decorative drifting streaks; fixed behind the header and main content. -->
+    <div class="bg-streaks" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+    </div>
+
     <!-- Keep the menu button outside the content that blurs when the menu opens. -->
     <button
         id="menuToggle"
@@ -172,7 +186,13 @@
                             <button id="playlistAddSongsToggle" class="btn-primary btn-small" type="button" aria-expanded="false" aria-controls="playlistAddPanel">
                                 Add songs
                             </button>
+                            <button id="playlistDeleteButton" class="btn-secondary btn-small btn-delete" type="button">Delete playlist</button>
                         </div>
+                    </div>
+                    <div id="playlistDeleteConfirmation" class="wizard-confirmation" hidden>
+                        <span>Delete this playlist? This cannot be undone.</span>
+                        <button id="playlistDeleteConfirm" class="btn-secondary btn-small btn-delete" type="button">Yes, delete</button>
+                        <button id="playlistDeleteCancel" class="btn-secondary btn-small" type="button">Cancel</button>
                     </div>
                     <p id="playlistDetailMessage" class="wizard-message" role="status" aria-live="polite"></p>
 

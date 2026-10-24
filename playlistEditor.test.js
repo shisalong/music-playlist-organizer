@@ -164,6 +164,23 @@ runTest('replacePlaylist swaps one playlist by ID and keeps order', () => {
     assertEqual(missing.playlists.length, 1, 'An unknown ID should not add a playlist');
 });
 
+runTest('deletePlaylist removes one playlist by ID and keeps the rest in order', () => {
+    const first = samplePlaylist();
+    const second = { ...samplePlaylist(), id: 'playlist-2', name: 'Second' };
+    const third = { ...samplePlaylist(), id: 'playlist-3', name: 'Third' };
+    const original = [first, second, third];
+    const result = Editor.deletePlaylist(original, 'playlist-2');
+    assert(result.deleted, 'An existing ID should be deleted');
+    assert(result.removed === second, 'The deleted playlist should be returned');
+    assertEqual(result.playlists.map((saved) => saved.id), ['playlist-1', 'playlist-3'], 'Others should keep their order');
+    assertEqual(original.length, 3, 'The original list must not change');
+
+    const missing = Editor.deletePlaylist(result.playlists, 'playlist-2');
+    assert(!missing.deleted, 'Deleting an unknown ID should report no deletion');
+    assert(missing.playlists === result.playlists, 'A missed delete should return the same list');
+    assert(missing.removed === null, 'A missed delete should not report a removed playlist');
+});
+
 console.log(`\nTest summary: ${passed} passed, ${failed} failed`);
 if (failed > 0) {
     process.exitCode = 1;

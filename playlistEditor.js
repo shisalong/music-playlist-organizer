@@ -101,6 +101,17 @@
         return { replaced: true, playlists: updated };
     }
 
+    // Remove one saved playlist by ID and report it, leaving the others in order.
+    function deletePlaylist(playlists, playlistId) {
+        const index = playlists.findIndex((saved) => saved.id === playlistId);
+        if (index === -1) {
+            return { deleted: false, playlists, removed: null };
+        }
+        const updated = [...playlists];
+        const [removed] = updated.splice(index, 1);
+        return { deleted: true, playlists: updated, removed };
+    }
+
     const PlaylistEditor = {
         MAX_PLAYLIST_NAME_LENGTH,
         getTrackId,
@@ -110,7 +121,8 @@
         restoreSong,
         renamePlaylist,
         moveSong,
-        replacePlaylist
+        replacePlaylist,
+        deletePlaylist
     };
 
     if (typeof module !== 'undefined' && module.exports) {

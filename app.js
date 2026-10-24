@@ -505,6 +505,7 @@ function renderWizardSeedSearch(query) {
         button.type = 'button';
         button.className = 'generator-seed-option';
         button.textContent = `${song.title || song.track_name || 'Untitled'} — ${song.artist || song.artists || 'Unknown artist'}`;
+        prependMusicNoteTile(button);
         button.addEventListener('click', () => selectWizardSeed(song.track_id));
         resultList.appendChild(button);
     });
@@ -738,9 +739,13 @@ function renderGeneratedPlaylist() {
                     return PlaylistUI.formatAudioFeature(feature, song[feature]);
                 })
             ];
-            values.forEach((value) => {
+            values.forEach((value, valueIndex) => {
                 const cell = document.createElement('td');
                 cell.textContent = value;
+                if (valueIndex === 1) {
+                    cell.className = 'generator-track-cell';
+                    prependMusicNoteTile(cell);
+                }
                 row.appendChild(cell);
             });
             body.appendChild(row);
@@ -920,9 +925,35 @@ function renderSearchResults(query) {
         addButton.textContent = 'Add to queue';
         addButton.addEventListener('click', () => addSongToPlaylist(song.track_id));
         card.appendChild(addButton);
+        prependMusicNoteTile(card);
         grid.appendChild(card);
     });
     searchResults.appendChild(grid);
+}
+
+// Return the shared rounded music-note icon markup used on every song row and card.
+function musicNoteIconMarkup() {
+    return '<svg class="music-note-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+        'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+        '<path d="M9 17.5V5.8a1 1 0 0 1 .8-1l9-1.7a1 1 0 0 1 1.2 1v11.4"></path>' +
+        '<path d="M9 9.2l11-2.1"></path>' +
+        '<circle cx="6.5" cy="17.5" r="2.5"></circle>' +
+        '<circle cx="17.5" cy="15.5" r="2.5"></circle>' +
+        '</svg>';
+}
+
+// Build the decorative tile that holds the music-note icon.
+function createMusicNoteTile() {
+    const tile = document.createElement('span');
+    tile.className = 'song-icon-tile';
+    tile.setAttribute('aria-hidden', 'true');
+    tile.innerHTML = musicNoteIconMarkup();
+    return tile;
+}
+
+// Put the music-note tile before a song element's existing content.
+function prependMusicNoteTile(element) {
+    element.insertBefore(createMusicNoteTile(), element.firstChild);
 }
 
 // Build the centered message used for empty and no-match search states.
@@ -1021,6 +1052,46 @@ function renderPlaylistCard(savedPlaylist, openable = false) {
     exportButton.disabled = !youtubeExportUI;
     exportButton.addEventListener('click', () => openYouTubeExport(savedPlaylist));
     card.appendChild(exportButton);
+
+    if (openable) {
+        const deleteButton = document.createElement('button');
+        deleteButton.className = 'btn-secondary btn-delete saved-playlist-delete';
+        deleteButton.type = 'button';
+        deleteButton.textContent = 'Delete';
+        deleteButton.setAttribute('aria-label', `Delete playlist ${savedPlaylist.name}`);
+        card.appendChild(deleteButton);
+
+        const confirmation = document.createElement('div');
+        confirmation.className = 'wizard-confirmation saved-playlist-confirm';
+        confirmation.hidden = true;
+        const question = document.createElement('span');
+        question.textContent = 'Delete this playlist?';
+        const confirmButton = document.createElement('button');
+        confirmButton.className = 'btn-secondary btn-delete';
+        confirmButton.type = 'button';
+        confirmButton.textContent = 'Yes, delete';
+        const keepButton = document.createElement('button');
+        keepButton.className = 'btn-secondary';
+        keepButton.type = 'button';
+        keepButton.textContent = 'Cancel';
+        confirmation.appendChild(question);
+        confirmation.appendChild(confirmButton);
+        confirmation.appendChild(keepButton);
+        card.appendChild(confirmation);
+
+        deleteButton.addEventListener('click', () => {
+            deleteButton.hidden = true;
+            confirmation.hidden = false;
+            confirmButton.focus();
+        });
+        keepButton.addEventListener('click', () => {
+            confirmation.hidden = true;
+            deleteButton.hidden = false;
+            deleteButton.focus();
+        });
+        confirmButton.addEventListener('click', () => deleteSavedPlaylist(savedPlaylist.id));
+    }
+    prependMusicNoteTile(card);
     return card;
 }
 
@@ -1088,6 +1159,7 @@ function renderRecommendations() {
         genre.className = 'recommendation-genre';
         genre.textContent = song.track_genre || 'Genre not available';
         card.appendChild(genre);
+        prependMusicNoteTile(card);
         recommendationsDisplay.appendChild(card);
     });
 }
@@ -1184,6 +1256,46 @@ function updateSavedPlaylist(updatedPlaylist) {
     return { success: true, message: '' };
 }
 
+// Delete one saved playlist by ID and refresh every view that lists playlists.
+function deleteSavedPlaylist(playlistId) {
+    const savedPlaylists = readSavedPlaylists();
+    if (savedPlaylists === null) {
+        showNotification('Saved playlists could not be accessed.', 'error');
+        return false;
+    }
+    const result = PlaylistEditor.deletePlaylist(savedPlaylists, playlistId);
+    if (!result.deleted) {
+        showNotification('That playlist no longer exists.', 'error');
+        updateLibraryDisplay();
+        return false;
+    }
+    try {
+        window.localStorage.setItem(
+            SAVED_PLAYLISTS_STORAGE_KEY,
+            JSON.stringify(result.playlists)
+        );
+    } catch (error) {
+        console.error('Could not delete playlist from localStorage:', error);
+        showNotification('Playlist could not be deleted in this browser.', 'error');
+        return false;
+    }
+
+    // A pending song-removal undo for this playlist can no longer apply.
+    if (pendingUndo && pendingUndo.playlistId === playlistId) {
+        hideUndoToast();
+    }
+    if (openPlaylistId === playlistId) {
+        openPlaylistId = null;
+        if (activeSection === 'playlist') {
+            switchSection('library');
+        }
+    }
+    renderSavedPlaylistCards(document.getElementById('homePlaylistsDisplay'));
+    updateLibraryDisplay();
+    showNotification(`Deleted playlist "${result.removed.name}".`);
+    return true;
+}
+
 // Find one saved playlist by ID, or null when storage or the ID is unavailable.
 function findSavedPlaylist(playlistId) {
     const savedPlaylists = readSavedPlaylists();
@@ -1208,6 +1320,19 @@ function setupPlaylistDetailUI() {
     document.getElementById('playlistAddSongsToggle').addEventListener('click', toggleAddSongsPanel);
     document.getElementById('playlistAddSearch').addEventListener('input', renderPlaylistAddResults);
     document.getElementById('undoToastButton').addEventListener('click', undoLastRemoval);
+    document.getElementById('playlistDeleteButton').addEventListener('click', () => {
+        document.getElementById('playlistDeleteConfirmation').hidden = false;
+        document.getElementById('playlistDeleteConfirm').focus();
+    });
+    document.getElementById('playlistDeleteCancel').addEventListener('click', () => {
+        document.getElementById('playlistDeleteConfirmation').hidden = true;
+        document.getElementById('playlistDeleteButton').focus();
+    });
+    document.getElementById('playlistDeleteConfirm').addEventListener('click', () => {
+        if (openPlaylistId) {
+            deleteSavedPlaylist(openPlaylistId);
+        }
+    });
 }
 
 // Open a Library playlist in the detail view with its editors reset.
@@ -1224,6 +1349,7 @@ function openPlaylistDetail(playlistId) {
     document.getElementById('playlistAddSongsToggle').setAttribute('aria-expanded', 'false');
     document.getElementById('playlistAddSongsToggle').textContent = 'Add songs';
     document.getElementById('playlistAddSearch').value = '';
+    document.getElementById('playlistDeleteConfirmation').hidden = true;
     setPlaylistDetailMessage('');
     switchSection('playlist');
     document.getElementById('playlistDetailBack').focus();
@@ -1251,10 +1377,12 @@ function renderPlaylistDetail() {
         document.getElementById('playlistDetailCount').textContent = '';
         document.getElementById('playlistRenameButton').disabled = true;
         document.getElementById('playlistAddSongsToggle').disabled = true;
+        document.getElementById('playlistDeleteButton').disabled = true;
         return;
     }
     document.getElementById('playlistRenameButton').disabled = false;
     document.getElementById('playlistAddSongsToggle').disabled = false;
+    document.getElementById('playlistDeleteButton').disabled = false;
     document.getElementById('playlistDetailName').textContent = savedPlaylist.name;
     const songCount = savedPlaylist.songs.length;
     const missingCount = savedPlaylist.songs.filter(isMissingFromCatalog).length;
@@ -1312,6 +1440,7 @@ function renderPlaylistSongRow(savedSong, index, songCount) {
         missingNote.textContent = 'Not in the current song catalog';
         info.appendChild(missingNote);
     }
+    row.appendChild(createMusicNoteTile());
     row.appendChild(info);
 
     const actions = document.createElement('div');
@@ -1572,6 +1701,7 @@ function renderPlaylistAddResults() {
         addButton.disabled = isAdded;
         addButton.addEventListener('click', () => addSongToOpenPlaylist(song.track_id));
         item.appendChild(addButton);
+        prependMusicNoteTile(item);
         resultList.appendChild(item);
     });
 }

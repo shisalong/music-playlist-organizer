@@ -759,6 +759,7 @@ textarea {
 }
 
 .playlist-add-label {
+    flex: 1;
     min-width: 0;
     overflow-wrap: anywhere;
     font-size: 14px;
@@ -772,7 +773,7 @@ textarea {
 
 .playlist-song-row {
     display: grid;
-    grid-template-columns: auto 2ch minmax(0, 1fr) auto;
+    grid-template-columns: auto 2ch 40px minmax(0, 1fr) auto;
     align-items: center;
     gap: 12px;
     padding: 10px 12px;
@@ -929,7 +930,7 @@ textarea {
 
 @media (max-width: 480px) {
     .playlist-song-row {
-        grid-template-columns: 2ch minmax(0, 1fr);
+        grid-template-columns: 2ch 40px minmax(0, 1fr);
     }
 
     .playlist-song-handle {
@@ -1002,6 +1003,94 @@ textarea {
 .recommendation-artist {
     color: var(--text-secondary);
     font-size: 14px;
+}
+
+/* Shared music-note tile shown at the left of every song row and card. */
+.song-icon-tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    color: #fbf3df;
+    background: linear-gradient(135deg, rgba(91, 192, 248, 0.24), rgba(25, 43, 74, 0.6));
+    border: 1px solid rgba(243, 226, 189, 0.38);
+    box-shadow: inset 0 1px 0 rgba(255, 250, 238, 0.12);
+    vertical-align: middle;
+}
+
+.music-note-icon {
+    width: 20px;
+    height: 20px;
+}
+
+/* Cards place the tile in a left column; their text and buttons stay in reading order. */
+.recommendation-song-card,
+.saved-playlist-card,
+.search-result-card {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    column-gap: 12px;
+    align-content: start;
+}
+
+.recommendation-song-card > *,
+.saved-playlist-card > *,
+.search-result-card > * {
+    grid-column: 2;
+}
+
+.recommendation-song-card > .song-icon-tile,
+.saved-playlist-card > .song-icon-tile,
+.search-result-card > .song-icon-tile {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    align-self: start;
+}
+
+.saved-playlist-card > .song-icon-tile {
+    grid-row: 1 / span 2;
+}
+
+.saved-playlist-card > button,
+.saved-playlist-card > .saved-playlist-confirm {
+    grid-column: 1 / -1;
+}
+
+.saved-playlist-delete {
+    margin-top: 0.75rem;
+    width: 100%;
+}
+
+.saved-playlist-card > [hidden] {
+    display: none;
+}
+
+.saved-playlist-confirm {
+    margin-top: 0.75rem;
+    justify-content: center;
+}
+
+/* Destructive actions keep the outline button shape with a red accent. */
+.btn-delete {
+    color: #ffb3ba;
+    border-color: rgba(226, 33, 52, 0.55);
+}
+
+.btn-delete:hover:not(:disabled) {
+    color: #fff;
+    border-color: #e22134;
+    background: rgba(226, 33, 52, 0.22);
+}
+
+.generator-track-cell .song-icon-tile {
+    margin-right: 10px;
+}
+
+.generator-table td {
+    vertical-align: middle;
 }
 
 /* Search Results */
@@ -1271,6 +1360,9 @@ textarea {
     font: inherit;
     text-align: left;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
 .generator-seed-option:hover,
@@ -1630,6 +1722,214 @@ textarea {
     .dashboard-section,
     .wizard-panel {
         background: var(--bg-solid-fallback);
+    }
+}
+
+/* Animated background: blurred angled streaks behind the app (header and main content sit above at z-index 1-2). */
+.bg-streaks {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Each streak is three joined segments: tail (::after), middle (the span), and head (::before).
+   The bends point the tail and head right-down while the middle runs right-up, forming a zigzag. */
+.bg-streaks span {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--streak-length, 360px);
+    height: var(--streak-thickness, 2px);
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.85));
+    filter: blur(1.5px) drop-shadow(0 0 6px rgba(255, 255, 255, 0.65));
+    opacity: 0;
+    will-change: transform, opacity;
+    animation: streakZigzag 20s linear infinite;
+}
+
+.bg-streaks span::before,
+.bg-streaks span::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    height: 100%;
+    border-radius: 999px;
+}
+
+.bg-streaks span::before {
+    left: 100%;
+    width: calc(var(--streak-length, 360px) * 0.75);
+    margin-left: -1px;
+    transform-origin: 0 50%;
+    transform: rotate(var(--streak-bend-head, 58deg));
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 1) 65%, rgba(255, 255, 255, 0));
+}
+
+.bg-streaks span::after {
+    right: 100%;
+    width: calc(var(--streak-length, 360px) * 0.85);
+    margin-right: -1px;
+    transform-origin: 100% 50%;
+    transform: rotate(var(--streak-bend-tail, 54deg));
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.45));
+}
+
+.bg-streaks span:nth-child(1) {
+    --streak-length: 380px;
+    --streak-thickness: 2px;
+    --streak-peak: 0.38;
+    --streak-bend-head: 58deg;
+    --streak-bend-tail: 52deg;
+    top: 4vh;
+    left: -6vw;
+    animation-duration: 18s;
+    animation-delay: 0s;
+}
+
+.bg-streaks span:nth-child(2) {
+    --streak-length: 280px;
+    --streak-thickness: 3px;
+    --streak-peak: 0.3;
+    --streak-bend-head: 66deg;
+    --streak-bend-tail: 48deg;
+    top: 18vh;
+    left: -14vw;
+    animation-duration: 24s;
+    animation-delay: -6s;
+}
+
+.bg-streaks span:nth-child(3) {
+    --streak-length: 520px;
+    --streak-thickness: 2px;
+    --streak-peak: 0.34;
+    --streak-bend-head: 50deg;
+    --streak-bend-tail: 62deg;
+    top: -8vh;
+    left: 6vw;
+    animation-duration: 28s;
+    animation-delay: -14s;
+}
+
+.bg-streaks span:nth-child(4) {
+    --streak-length: 320px;
+    --streak-thickness: 4px;
+    --streak-peak: 0.28;
+    --streak-bend-head: 70deg;
+    --streak-bend-tail: 56deg;
+    top: 30vh;
+    left: -20vw;
+    animation-duration: 16s;
+    animation-delay: -3s;
+}
+
+.bg-streaks span:nth-child(5) {
+    --streak-length: 440px;
+    --streak-thickness: 2px;
+    --streak-peak: 0.42;
+    --streak-bend-head: 54deg;
+    --streak-bend-tail: 66deg;
+    top: 12vh;
+    left: 2vw;
+    animation-duration: 22s;
+    animation-delay: -10s;
+}
+
+.bg-streaks span:nth-child(6) {
+    --streak-length: 260px;
+    --streak-thickness: 3px;
+    --streak-peak: 0.32;
+    --streak-bend-head: 62deg;
+    --streak-bend-tail: 50deg;
+    top: 40vh;
+    left: -10vw;
+    animation-duration: 14s;
+    animation-delay: -8s;
+}
+
+.bg-streaks span:nth-child(7) {
+    --streak-length: 560px;
+    --streak-thickness: 2px;
+    --streak-peak: 0.28;
+    --streak-bend-head: 48deg;
+    --streak-bend-tail: 58deg;
+    top: -2vh;
+    left: -22vw;
+    animation-duration: 30s;
+    animation-delay: -21s;
+}
+
+.bg-streaks span:nth-child(8) {
+    --streak-length: 360px;
+    --streak-thickness: 3px;
+    --streak-peak: 0.38;
+    --streak-bend-head: 64deg;
+    --streak-bend-tail: 54deg;
+    top: 24vh;
+    left: 10vw;
+    animation-duration: 20s;
+    animation-delay: -15s;
+}
+
+.bg-streaks span:nth-child(9) {
+    --streak-length: 300px;
+    --streak-thickness: 2px;
+    --streak-peak: 0.34;
+    --streak-bend-head: 56deg;
+    --streak-bend-tail: 70deg;
+    top: 8vh;
+    left: -16vw;
+    animation-duration: 26s;
+    animation-delay: -4s;
+}
+
+.bg-streaks span:nth-child(10) {
+    --streak-length: 480px;
+    --streak-thickness: 3px;
+    --streak-peak: 0.3;
+    --streak-bend-head: 60deg;
+    --streak-bend-tail: 46deg;
+    top: 34vh;
+    left: 0vw;
+    animation-duration: 19s;
+    animation-delay: -12s;
+}
+
+/* Zigzag legs: right-down, right-up, right-down, right-up, right-down; only transform and opacity animate. */
+@keyframes streakZigzag {
+    0% {
+        opacity: 0;
+        transform: translate(-40vw, -30vh) rotate(-35deg);
+    }
+    10% {
+        opacity: var(--streak-peak, 0.18);
+    }
+    25% {
+        transform: translate(15vw, 25vh) rotate(-35deg);
+    }
+    42% {
+        transform: translate(38vw, 8vh) rotate(-35deg);
+    }
+    60% {
+        transform: translate(65vw, 58vh) rotate(-35deg);
+    }
+    78% {
+        transform: translate(88vw, 40vh) rotate(-35deg);
+    }
+    88% {
+        opacity: var(--streak-peak, 0.18);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(125vw, 95vh) rotate(-35deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bg-streaks {
+        display: none;
     }
 }
 

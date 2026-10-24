@@ -5,7 +5,7 @@
   "main": "index.html",
   "scripts": {
     "config": "node scripts/generate-config.js",
-    "dev": "npm run config && http-server . -p 3010 -o",
+    "dev": "npm run config && http-server . -p 3010 -o -c-1",
     "start": "npm run dev",
     "test": "node btree.test.js && node graph.test.js && node playlistGenerator.test.js && node playlistUI.test.js && node playlistWizard.test.js && node playlistEditor.test.js && node app.test.js && node integrations/youtube/youtubeMatcher.test.js && node integrations/youtube/youtubeAuth.test.js && node integrations/youtube/youtubeExporter.test.js"
   },
