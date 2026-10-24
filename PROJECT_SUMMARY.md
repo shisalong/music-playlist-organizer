@@ -13,7 +13,7 @@
 - Mobile-responsive design
 
 ### DSA Algorithms Implemented ✓
-1. **Binary Search Tree (BST)** - Song catalog management
+1. **B-Tree** - Song catalog indexed by track ID
 2. **Circular Queue** - Playlist playback
 3. **Priority Queue (Max Heap)** - Recommendations
 4. **Heap Sort** - Playlist sorting
@@ -35,12 +35,12 @@
 
 ### DSA Structures
 ```javascript
-// 1. Binary Search Tree
-- TreeNode class
-- Recursive insertion
-- Tree traversal (in-order)
-- Height calculation
-- Search functionality
+// 1. B-Tree
+- BTreeNode and BTree classes
+- Split full nodes during insertion
+- Tree traversal (in-order by track ID)
+- Height and invariant validation
+- Track ID search plus title-search compatibility scan
 
 // 2. Circular Queue
 - Array-based implementation
@@ -64,26 +64,26 @@
 
 ## 📊 Algorithm Demonstrations
 
-### 1. Binary Search Tree
+### 1. B-Tree
 **Visual Example:**
 ```
-Adding songs: "Bohemian Rhapsody", "Imagine", "Hotel California"
+Adding track IDs: "track-b", "track-a", "track-c"
 
-Resulting BST:
-    "Bohemian Rhapsody" (Root)
-    ├─ "Hotel California"
-    └─ "Imagine"
+Resulting B-Tree (minimum degree 2):
+            "track-b"
+           /         \
+      "track-a"    "track-c"
 
-Operation: search("imag")
-→ Traverses tree, finds "Imagine"
-→ Returns result in O(log n) time
+Operation: search("track-a")
+→ Compares the ID in each node and descends into the matching child
+→ Returns the song in O(log n) time for fixed minimum degree
 ```
 
 **Learning Points:**
-- Efficient searching O(log n)
-- Maintains sorted order
-- Recursive tree operations
-- Height affects performance
+- Splitting full nodes keeps the tree balanced
+- Maintains ascending track ID order
+- Every leaf remains at the same depth
+- Title substring search is a traversal scan because the index key is track ID
 
 ### 2. Circular Queue
 **Visual Example:**
@@ -173,8 +173,9 @@ Sorted: [10, 9, 8, 7, 6]
 
 | Operation | Data Structure | Time | Space |
 |-----------|---------------|------|-------|
-| Insert Song | BST | O(log n) | O(n) |
-| Search Song | BST | O(log n) | O(1) |
+| Insert Song | B-Tree | O(log n) | O(n) |
+| Search by Track ID | B-Tree | O(log n) | O(1) |
+| Search by Title | B-Tree traversal | O(n) | O(1) |
 | Add to Playlist | Queue | O(1) | O(n) |
 | Next/Previous | Queue | O(1) | O(1) |
 | Get Recommendations | Heap | O(k log n) | O(1) |
@@ -225,6 +226,8 @@ Music Playlist Organizer/
 ├── styles.css          # Styling and design
 ├── dsa.js             # DSA implementations
 ├── app.js             # Application logic
+├── songs_cleaned.csv  # Catalog dataset (first 5,000 rows loaded)
+├── btree.test.js      # Standalone B-Tree and CSV tests
 ├── package.json       # Configuration
 ├── README.md          # Full documentation
 ├── QUICK_START.md     # Quick reference
@@ -279,4 +282,3 @@ The project serves as an excellent resource for understanding how data structure
 ---
 
 *Built with careful attention to DSA principles and educational value*
-

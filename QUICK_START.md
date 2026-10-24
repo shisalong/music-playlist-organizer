@@ -21,6 +21,12 @@ npm start
 ## Step 3: Open in Browser
 The application will automatically open at **http://localhost:3000**
 
+The catalog loads up to the first 5,000 data rows from `songs_cleaned.csv` in the project root. Run the standalone data-structure tests with:
+
+```bash
+node btree.test.js
+```
+
 ---
 
 ## 🎯 Try These Features
@@ -32,7 +38,7 @@ The application will automatically open at **http://localhost:3000**
 
 ### 2. Search Songs
 - Type in the search box
-- See BST search in action
+- See the B-Tree catalog's title-search compatibility scan
 - Click results to add to playlist
 
 ### 3. Play Music
@@ -54,7 +60,7 @@ The application will automatically open at **http://localhost:3000**
 
 | Algorithm | What It Does | Where to See It |
 |-----------|--------------|-----------------|
-| **BST** | Organizes songs alphabetically | Add songs, then search |
+| **B-Tree** | Indexes songs by track ID | Load the catalog, then search |
 | **Circular Queue** | Loops through playlist | Use Next/Previous buttons |
 | **Max Heap** | Prioritizes by rating | Recommendations panel |
 | **Heap Sort** | Sorts by rating | Shuffle button |
@@ -63,10 +69,10 @@ The application will automatically open at **http://localhost:3000**
 
 ## 🎓 DSA Concepts Demonstrated
 
-✅ **Binary Search Tree (BST)**
-- Insertion: O(log n)
-- Search: O(log n)
-- In-order traversal
+✅ **B-Tree**
+- Insert and track ID search: O(log n) for fixed minimum degree
+- In-order traversal by track ID
+- Title substring search: O(n) compatibility scan
 
 ✅ **Circular Queue**
 - O(1) enqueue/dequeue
@@ -89,7 +95,7 @@ The application will automatically open at **http://localhost:3000**
 
 - **Check the visualization panel** to see algorithms in action
 - **Watch statistics** update in real-time
-- **Try adding many songs** to see BST grow
+- **Try loading the catalog** to see B-Tree height change
 - **Test circular navigation** by playing through the playlist
 - **Shuffle multiple times** to see consistent sorting
 
@@ -107,4 +113,3 @@ The application will automatically open at **http://localhost:3000**
 ---
 
 **Enjoy exploring DSA in action!** 🎉
-

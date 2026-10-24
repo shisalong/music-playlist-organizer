@@ -3,7 +3,9 @@
 // ============================================
 
 // Initialize DSA structures
-const songCatalog = new DSA.BinarySearchTree();
+const songCatalog = new DSA.BTree();
+const songIndex = new DSA.SortedSongIndex(songCatalog);
+let songGraph = null;
 const playlist = new DSA.CircularQueue(100);
 const recommendations = new DSA.MaxHeap();
 let isPlaying = false;
@@ -24,12 +26,14 @@ function initializeSampleSongs() {
     ];
 
     sampleSongs.forEach(song => {
-        const songWithId = { ...song, id: Date.now() + Math.random() };
-        songCatalog.insert(songWithId);
+        const trackId = `sample-${Date.now()}-${Math.random()}`;
+        const songWithId = { ...song, id: trackId, track_id: trackId };
+        songCatalog.insert(trackId, songWithId);
         recommendations.insert(songWithId);
         playlist.enqueue(songWithId);
     });
 
+    songIndex.rebuild();
     updateStatistics();
     updateRecommendations();
     updatePlaylistDisplay();
@@ -37,6 +41,43 @@ function initializeSampleSongs() {
     updateQueueStatus();
     updateNowPlaying();
 }
+
+// Load the catalog dataset without adding its songs to playback or recommendations.
+async function loadCSVSongs() {
+    try {
+        const response = await fetch('songs_cleaned.csv');
+        if (!response.ok) {
+            throw new Error(`Could not load songs_cleaned.csv: ${response.status}`);
+        }
+
+        const csvText = await response.text();
+        const stats = DSA.loadSongsFromCSV(csvText, songCatalog);
+        songIndex.rebuild();
+        songGraph = new DSA.SongGraph().buildFromSongs(songCatalog.inorderTraversal());
+        window.songGraph = songGraph;
+        updateStatistics();
+        updateLibraryDisplay();
+        addVisualizationStep(
+            `🎵 Loaded ${stats.songsInserted} CSV songs into the B-Tree catalog`
+        );
+    } catch (error) {
+        console.error('Failed to load the song CSV:', error);
+        showNotification('Could not load songs_cleaned.csv; sample songs are still available.', 'error');
+    }
+}
+
+// Compare both O(log n) lookups against the same catalog song without changing UI search.
+function compareRetrievalMethods(trackId) {
+    const btreeResult = songCatalog.search(trackId);
+    const binaryResult = DSA.binarySearchByTrackId(songIndex.songs, trackId);
+    return {
+        trackId: String(trackId === null || trackId === undefined ? '' : trackId).trim(),
+        btreeResult,
+        binaryResult,
+        match: btreeResult === binaryResult
+    };
+}
+window.compareRetrievalMethods = compareRetrievalMethods;
 
 // Navigation
 function setupNavigation() {
@@ -120,18 +161,22 @@ function addSong() {
         return;
     }
 
+    const id = Date.now();
+    const trackId = `manual-${id}`;
     const song = {
         title,
         artist,
         duration,
         rating,
-        id: Date.now() // Unique ID
+        id: trackId,
+        track_id: trackId
     };
 
     try {
-        // Add to BST
-        songCatalog.insert(song);
-        addVisualizationStep(`✓ Added "${song.title}" to song catalog (BST)`);
+        // Add to B-Tree
+        songCatalog.insert(trackId, song);
+        songIndex.rebuild();
+        addVisualizationStep(`✓ Added "${song.title}" to song catalog (B-Tree)`);
         
         // Add to playlist
         playlist.enqueue(song);
@@ -163,7 +208,7 @@ function addSong() {
     }
 }
 
-// Search for songs in BST
+// Search song titles using the B-Tree's compatibility scan.
 function searchSongs(event) {
     const query = event.target.value.trim();
     const searchResults = document.getElementById('searchResults');
@@ -178,8 +223,10 @@ function searchSongs(event) {
         return;
     }
 
-    const results = songCatalog.search(query);
-    addVisualizationStep(`🔍 Searched for "${query}" in BST - Found ${results.length} result(s)`);
+    const results = songCatalog.searchByTitle(query).sort((firstSong, secondSong) => {
+        return firstSong.title.toLowerCase().localeCompare(secondSong.title.toLowerCase());
+    });
+    addVisualizationStep(`🔍 Searched for "${query}" in B-Tree - Found ${results.length} result(s)`);
     
     if (results.length === 0) {
         searchResults.innerHTML = `
@@ -192,7 +239,7 @@ function searchSongs(event) {
     }
 
     searchResults.innerHTML = results.map(song => `
-        <div class="search-result-item" onclick="addSongToPlaylist('${song.id}')">
+        <div class="search-result-item" onclick="addSongToPlaylist('${song.track_id}')">
             <div class="search-result-art">🎵</div>
             <div class="search-result-info">
                 <div class="search-result-title">${song.title}</div>
@@ -205,8 +252,7 @@ function searchSongs(event) {
 
 // Add searched song to playlist
 function addSongToPlaylist(songId) {
-    const allSongs = songCatalog.getAllSongs();
-    const song = allSongs.find(s => s.id == songId);
+    const song = songCatalog.search(songId);
     
     if (song) {
         playlist.enqueue(song);
@@ -261,7 +307,9 @@ function setCurrentSong(index) {
 // Update library display
 function updateLibraryDisplay() {
     const libraryDisplay = document.getElementById('libraryDisplay');
-    const allSongs = songCatalog.getAllSongs();
+    const allSongs = songCatalog.inorderTraversal().sort((firstSong, secondSong) => {
+        return firstSong.title.toLowerCase().localeCompare(secondSong.title.toLowerCase());
+    });
     
     if (allSongs.length === 0) {
         libraryDisplay.innerHTML = '<p class="empty-state">No songs in library yet</p>';
@@ -269,7 +317,7 @@ function updateLibraryDisplay() {
     }
 
     libraryDisplay.innerHTML = allSongs.map(song => `
-        <div class="library-song-card" onclick="addSongToPlaylist('${song.id}')">
+        <div class="library-song-card" onclick="addSongToPlaylist('${song.track_id}')">
             <div class="library-song-art">🎵</div>
             <div class="library-song-title">${song.title}</div>
             <div class="library-song-artist">${song.artist} • ⭐ ${song.rating}</div>
@@ -439,12 +487,11 @@ function playPrevious() {
 
 // Update statistics
 function updateStatistics() {
-    const allSongs = songCatalog.getAllSongs();
-    const totalSongs = allSongs.length;
-    const bstHeight = songCatalog.getHeight();
+    const totalSongs = songCatalog.size;
+    const btreeHeight = songCatalog.height();
     
     document.getElementById('totalSongs').textContent = totalSongs;
-    document.getElementById('bstHeight').textContent = bstHeight;
+    document.getElementById('btreeHeight').textContent = btreeHeight;
 }
 
 // Update recommendations
@@ -458,7 +505,7 @@ function updateRecommendations() {
     }
 
     recommendationsDisplay.innerHTML = topRecommendations.slice(0, 5).map(song => `
-        <div class="recommendation-item" onclick="addSongToPlaylist('${song.id}')">
+        <div class="recommendation-item" onclick="addSongToPlaylist('${song.track_id}')">
             <div class="recommendation-item-content">
                 <div class="recommendation-title">${song.title}</div>
                 <div class="recommendation-artist">${song.artist}</div>
@@ -585,10 +632,11 @@ function setupProgressBar() {
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     initializeSampleSongs();
+    loadCSVSongs();
     setupNavigation();
     setupProgressBar();
     addVisualizationStep('🎵 Music Playlist Organizer initialized with sample songs');
-    addVisualizationStep('📚 DSA structures: BST, Circular Queue, Max Heap ready');
+    addVisualizationStep('📚 DSA structures: B-Tree, Circular Queue, Max Heap ready');
     
     // Allow Enter key to add song
     document.getElementById('songRating').addEventListener('keypress', (e) => {

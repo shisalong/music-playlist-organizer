@@ -13,24 +13,97 @@ This project is a **working web application** that allows users to:
 
 ## 🎯 DSA Algorithms Implemented
 
-### 1. **Binary Search Tree (BST)** 🌳
-**Purpose:** Efficient song catalog management and searching
+### 1. **B-Tree** 🌳
+**Purpose:** Balanced song catalog management indexed by `track_id`
 
 **Operations Implemented:**
-- `insert()` - Add songs to catalog (O(log n) average case)
-- `search()` - Find songs by title (O(log n) average case)
-- `getAllSongs()` - In-order traversal for sorted output
-- `getHeight()` - Calculate tree height
+- `insert(trackId, song)` - Add a unique song to the B-Tree
+- `search(trackId)` - Find a song by its trimmed track ID
+- `inorderTraversal()` - Return songs in ascending track ID order
+- `height()` - Return the number of B-Tree levels
+- `searchByTitle(query)` - Keep the existing title search using a simple traversal scan
 
 **Use Case:** 
-- Songs are stored in a BST sorted alphabetically by title
-- Search functionality uses tree traversal to find matching songs
-- Maintains sorted order for efficient retrieval
+- Catalog songs are stored by `track_id`; the B-Tree remains balanced as it grows
+- The existing partial-title search is retained as a compatibility scan
+- Tree traversal is by track ID; the UI sorts displayed library and search results by title
+- The supplied `songs_cleaned.csv` file is loaded from the project root, up to the first 5,000 data rows
 
 **Complexity:**
-- Insert: O(log n) average, O(n) worst case (unbalanced tree)
-- Search: O(log n) average, O(n) worst case
+- Insert and track ID lookup: O(log n) for fixed minimum degree
+- Title substring search and full traversal: O(n)
 - Space: O(n)
+
+---
+
+### Binary Search by Track ID 🔎
+**Purpose:** Compare searching a sorted song array with looking up the same song in the B-Tree.
+
+**Where It Lives:**
+- `binarySearchIndexByTrackId()` and `binarySearchByTrackId()` are implemented in `dsa.js`
+- `SortedSongIndex` builds one verified snapshot from `BTree.inorderTraversal()`
+- `compareRetrievalMethods(trackId)` in `app.js` returns both results for a console demo; the UI search remains B-Tree-based
+
+**How It Works:**
+- Binary search checks the middle track ID and discards the half that cannot contain the requested ID
+- The array must be sorted by `track_id` first; the index uses the B-Tree's in-order traversal, so it starts sorted and contains the same unique songs
+- The B-Tree stays balanced while songs are inserted; inserting into a sorted array can require shifting many entries
+- `SortedSongIndex.rebuild()` refreshes the snapshot after catalog changes; a search does not sort the array again
+
+**Complexity:**
+
+| Operation | Data Structure | Time | Extra Space |
+|-----------|----------------|------|-------------|
+| Search track ID | Sorted array (iterative binary search) | O(log n) | O(1) |
+| Build array from B-Tree traversal | Sorted array | O(n) | O(n) for the snapshot |
+| Build array from unsorted raw songs | Sorted array | O(n log n) | O(n) for the copy |
+| Insert into a sorted array | Sorted array | O(n) due to shifting | O(1) additional |
+| Search track ID | B-Tree | O(t * log_t n) | O(1) |
+| Insert song | B-Tree | O(t * log_t n), O(log n) for fixed t | O(1) auxiliary |
+
+**Example:**
+```javascript
+const tree = new DSA.BTree();
+tree.insert('track-b', { track_id: 'track-b', title: 'Second Song' });
+tree.insert('track-a', { track_id: 'track-a', title: 'First Song' });
+
+const songIndex = new DSA.SortedSongIndex(tree);
+const song = songIndex.search('track-a');
+console.log(song ? song.title : 'Not found');
+```
+
+Run the B-Tree and binary search tests with:
+```bash
+node btree.test.js
+```
+
+No timing benchmark is included by default. Any optional timing comparison should be treated as approximate: results depend on the machine, runtime, and repetition count.
+
+---
+
+### Song Similarity Graph 🎧
+**Purpose:** Find songs with similar audio features using a directed, weighted adjacency-list graph.
+
+**How It Works:**
+- After the CSV catalog loads, `app.js` builds a `SongGraph` from the B-Tree's unique in-order song traversal. The existing loader, retrieval, playlist, playback, and UI search behavior are unchanged.
+- Songs with finite numeric `danceability`, `energy`, `acousticness`, `valence`, and `tempo` values become graph nodes. Songs without these values (including the seven sample songs) are recorded in `skippedSongs`.
+- Each feature is min-max normalized across valid songs; constant-valued features normalize to zero. Pairwise Euclidean distance across the five normalized features becomes a similarity weight: `1 - distance / sqrt(5)`.
+- Each node stores up to 10 outgoing edges by default. Edges are directed: a song may choose another song without being chosen in return. Neighbors are ordered by descending similarity, then ascending `track_id`.
+- `bfs(trackId, { limit })` and `dfs(trackId, { limit })` iteratively traverse reachable outgoing edges and return track IDs. Unknown starts return an empty array; `getNeighbors()` also returns an empty array for unknown IDs, while `getSong()` returns `null`.
+
+**Example:**
+```javascript
+const graph = new DSA.SongGraph().buildFromSongs(songCatalog.inorderTraversal());
+const neighbors = graph.getNeighbors('some-track-id');
+console.log(neighbors); // [{ to: 'another-track-id', weight: 0.98 }, ...]
+console.log(graph.bfs('some-track-id', { limit: 20 }));
+```
+
+**Complexity and Limitations:**
+- Building the graph currently compares every valid song pair: O(n² × 5) time. Only the best `k` outgoing edges per node are retained, so graph storage is O(nk); this is suitable for the existing 5,000-row CSV load but not the full ~80,000-row dataset.
+- Traversals take O(V + E) time and O(V) auxiliary space.
+- The existing CSV loader converts missing or malformed numeric values to `0`. Per the chosen behavior, graph validation treats those resulting zeros as valid values; it cannot distinguish them from true zero-valued source data without changing the loader.
+- Run graph tests with `node graph.test.js`; run the existing B-Tree, CSV, and binary-search tests with `node btree.test.js`.
 
 ---
 
@@ -128,6 +201,11 @@ This project is a **working web application** that allows users to:
    - The application will automatically open at `http://localhost:3000`
    - Or manually navigate to the provided URL
 
+   Run the standalone B-Tree and CSV tests with:
+   ```bash
+   node btree.test.js
+   ```
+
 ### Usage
 
 #### Adding Songs
@@ -138,13 +216,13 @@ This project is a **working web application** that allows users to:
    - Rating (1-10 scale)
 2. Click "Add Song"
 3. The song is automatically added to:
-   - Song catalog (BST)
+   - Song catalog (B-Tree)
    - Current playlist (Circular Queue)
    - Recommendations (Max Heap)
 
 #### Searching Songs
 1. Type in the search box
-2. Matching songs from the BST catalog will appear
+2. Matching song titles from the B-Tree catalog will appear
 3. Click any result to add it to the playlist
 
 #### Managing Playlist
@@ -167,7 +245,7 @@ This project is a **working web application** that allows users to:
 
 The application includes **real-time visualization** of DSA operations:
 - See when songs are added to different structures
-- Track search operations in BST
+- Track search operations in the B-Tree catalog
 - Monitor circular queue navigation
 - Watch heap operations during shuffle
 
@@ -181,8 +259,10 @@ Visualizations appear in the center panel's "Algorithm Visualization" section.
 Music Playlist Organizer/
 ├── index.html          # Main HTML structure
 ├── styles.css          # Modern UI styling
-├── dsa.js             # DSA implementations (BST, Queue, Heap)
+├── dsa.js             # DSA implementations (B-Tree, Queue, Heap)
 ├── app.js             # Application logic and UI interactions
+├── songs_cleaned.csv  # Song catalog dataset (first 5,000 rows loaded)
+├── btree.test.js      # Standalone Node.js B-Tree tests
 ├── package.json       # Project configuration
 └── README.md          # This file
 ```
@@ -222,7 +302,7 @@ This project demonstrates:
 
 ### Functionality
 - ✅ Full CRUD operations on songs
-- 🔍 Fast search with BST
+- 🔍 Track ID lookup with B-Tree and title search compatibility scan
 - 🔄 Seamless circular playback
 - ⭐ Smart recommendations
 - 📈 Live statistics tracking
@@ -236,7 +316,7 @@ This project demonstrates:
 
 | Structure | Use Case | Insert | Search | Extract Max | Space |
 |-----------|----------|--------|--------|-------------|-------|
-| **BST** | Song catalog | O(log n) | O(log n) | - | O(n) |
+| **B-Tree** | Song catalog | O(log n) | O(log n) by track ID | - | O(n) |
 | **Circular Queue** | Playlist | O(1) | - | O(1) | O(n) |
 | **Max Heap** | Recommendations | O(log n) | - | O(log n) | O(n) |
 
@@ -254,7 +334,7 @@ This project demonstrates:
 ## 📝 Future Enhancements
 
 Potential additions for extended learning:
-- [ ] AVL Tree for self-balancing BST
+- [ ] B-Tree deletion as a separate extension
 - [ ] Graph algorithms for music recommendation engine
 - [ ] Hash table for O(1) artist lookup
 - [ ] Trie for autocomplete search
@@ -296,4 +376,3 @@ Created as a DSA project demonstrating practical implementations of fundamental 
 **Built with ❤️ for DSA Learning**
 
 *"The best way to learn algorithms is to implement them in a real project!"*
-
