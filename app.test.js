@@ -5,6 +5,7 @@ const DSA = require('./dsa.js');
 const { PlaylistGenerator, MOOD_NAMES, MOOD_PROFILES } = require('./playlistGenerator.js');
 const PlaylistUI = require('./playlistUI.js');
 const PlaylistWizard = require('./playlistWizard.js');
+const PlaylistEditor = require('./playlistEditor.js');
 
 let passed = 0;
 let failed = 0;
@@ -171,6 +172,7 @@ function createApp(fetchImplementation, localStorage = createMemoryStorage()) {
         PlaylistGenerator,
         PlaylistUI,
         PlaylistWizard,
+        PlaylistEditor,
         MOOD_NAMES,
         MOOD_PROFILES,
         document,
@@ -229,13 +231,10 @@ function csvResponse(csvText) {
     };
 }
 
-// Check that an empty app still guards all playback controls and playlist actions.
-function verifyEmptyPlaybackControls(app) {
-    app.context.playPause();
-    app.context.playNext();
-    app.context.playPrevious();
+// Check that an empty app still guards queue and playlist actions.
+function verifyEmptyQueueControls(app) {
     app.context.shufflePlaylist();
-    assert(app.evaluate('playlist.isEmpty()'), 'Playback controls must leave an empty queue usable');
+    assert(app.evaluate('playlist.isEmpty()'), 'Queue actions must leave an empty queue usable');
     assertEqual(
         app.evaluate('catalogSongs.length'),
         0,
@@ -312,7 +311,7 @@ async function main() {
         app.elements.get('wizardNameInput').value = 'Empty catalog';
         app.elements.get('wizardNameForm').listeners.get('submit')({ preventDefault() {} });
         assert(app.elements.get('wizardSongMethod').disabled, 'Empty catalog options must stay disabled in the wizard');
-        verifyEmptyPlaybackControls(app);
+        verifyEmptyQueueControls(app);
     });
 
     await runTest('failed CSV fetch leaves no fake catalog songs and reports the failure', async () => {
@@ -329,7 +328,7 @@ async function main() {
         assert(app.elements.get('wizardSongMethod').disabled, 'Failed CSV load should disable song generation');
         assert(app.elements.get('wizardMoodMethod').disabled, 'Failed CSV load should disable mood generation');
         assert(app.loggedErrors.some((message) => message.includes('network unavailable')), 'Underlying fetch failure should be logged');
-        verifyEmptyPlaybackControls(app);
+        verifyEmptyQueueControls(app);
     });
 
     await runTest('real CSV startup contains only source records and preserves legitimate title collisions', async () => {

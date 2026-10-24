@@ -13,10 +13,16 @@ const SAVED_PLAYLISTS_STORAGE_KEY = 'genmixSavedPlaylists';
 const RECOMMENDATION_COUNT = 12;
 const LOADING_DURATION_MS = 2500;
 const GENERATION_SAFETY_TIMEOUT_MS = 10000;
-let isPlaying = false;
-let currentTime = 0;
-let totalTime = 0;
-let progressInterval = null;
+const SEARCH_DEBOUNCE_MS = 250;
+const SEARCH_STAGGER_LIMIT = 12;
+const UNDO_DURATION_MS = 5000;
+const PLAYLIST_ADD_SEARCH_LIMIT = 30;
+let searchDebounceTimer = null;
+let searchReturnSection = null;
+let openPlaylistId = null;
+let pendingUndo = null;
+let undoToastTimer = null;
+let dragSourceIndex = null;
 let lastGeneratedPlaylist = null;
 window.lastGeneratedPlaylist = null;
 let wizardState = PlaylistWizard.createWizardState();
@@ -112,7 +118,6 @@ function openMenu() {
     menuToggle.setAttribute('aria-label', 'Close menu');
     document.getElementById('appHeader').inert = true;
     document.getElementById('mainContent').inert = true;
-    document.getElementById('playerBar').inert = true;
     document.getElementById('mainContent').classList.add('menu-blurred');
 
     const currentItem = menu.querySelector('[aria-current="page"]') || menu.querySelector('.nav-item');
@@ -139,7 +144,6 @@ function closeMenu() {
     menuToggle.setAttribute('aria-label', 'Open menu');
     document.getElementById('appHeader').inert = false;
     document.getElementById('mainContent').inert = false;
-    document.getElementById('playerBar').inert = false;
     document.getElementById('mainContent').classList.remove('menu-blurred');
     document.body.style.overflow = previousBodyOverflow;
     menuToggle.focus();
@@ -199,8 +203,9 @@ function setupNavigation() {
 }
 
 // Show one content section and keep the matching menu item accessible.
-function switchSection(section) {
-    if (activeSection === 'generator' && section !== 'generator') {
+// Global search passes preserveWizard so a detour to Search keeps wizard progress.
+function switchSection(section, options = {}) {
+    if (activeSection === 'generator' && section !== 'generator' && !options.preserveWizard) {
         cancelPlaylistWizard();
     }
     const sections = document.querySelectorAll('.content-section');
@@ -218,6 +223,10 @@ function switchSection(section) {
             document.getElementById('librarySection').classList.add('active');
             updateLibraryDisplay();
             break;
+        case 'playlist':
+            document.getElementById('playlistDetailSection').classList.add('active');
+            renderPlaylistDetail();
+            break;
         case 'generator':
             document.getElementById('generatorSection').classList.add('active');
             updateGeneratorAvailability();
@@ -226,8 +235,10 @@ function switchSection(section) {
     }
     activeSection = section;
 
+    // The playlist detail view belongs to the Library menu item.
+    const navSection = section === 'playlist' ? 'library' : section;
     document.querySelectorAll('.nav-item').forEach((item) => {
-        const isCurrent = item.getAttribute('data-section') === section;
+        const isCurrent = item.getAttribute('data-section') === navSection;
         item.classList.toggle('active', isCurrent);
         if (isCurrent) {
             item.setAttribute('aria-current', 'page');
@@ -365,7 +376,9 @@ function updateGeneratorAvailability() {
 }
 
 // Show one step panel, synchronize its inputs, and move keyboard focus.
-function renderWizardStep(step) {
+// The direction picks which side the entering panel slides in from.
+function renderWizardStep(step, direction = 'forward') {
+    document.getElementById('generatorWizard').classList.toggle('wizard-going-back', direction === 'back');
     const panels = {
         start: 'wizardStartPanel',
         name: 'wizardNamePanel',
@@ -457,7 +470,7 @@ function selectWizardMethod(method) {
 // Return to a prior step without clearing the name or chosen song and mood.
 function moveWizardBack(step) {
     wizardState = PlaylistWizard.goToStep(wizardState, step);
-    renderWizardStep(wizardState.step);
+    renderWizardStep(wizardState.step, 'back');
 }
 
 // Search the cached sorted catalog with the shared capped title/artist helper.
@@ -554,7 +567,7 @@ function cancelPlaylistWizard() {
     lastGeneratedPlaylist = null;
     window.lastGeneratedPlaylist = null;
     document.getElementById('wizardNameError').textContent = '';
-    renderWizardStep('start');
+    renderWizardStep('start', 'back');
 }
 
 // Invalidate a running request so a late result cannot overwrite the new state.
@@ -802,7 +815,7 @@ function discardGeneratedPlaylist() {
 function backFromEmptyResult() {
     const selectionStep = wizardState.method === 'song' ? 'song' : 'mood';
     wizardState = PlaylistWizard.goToStep(wizardState, selectionStep);
-    renderWizardStep(wizardState.step);
+    renderWizardStep(wizardState.step, 'back');
 }
 
 // Open the DSA operation visualizer.
@@ -826,17 +839,44 @@ document.addEventListener('click', (e) => {
     });
 });
 
-// Search song titles using the B-Tree's compatibility scan.
-function searchSongs(event) {
-    const query = event.target.value.trim();
-    const searchResults = document.getElementById('searchResults');
-    
+// Bind the header search so typing on any screen opens Search after a short pause.
+function setupGlobalSearch() {
+    const searchInput = document.getElementById('searchInput');
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+            searchDebounceTimer = null;
+            handleGlobalSearch(searchInput.value);
+        }, SEARCH_DEBOUNCE_MS);
+    });
+}
+
+// Move to Search for a query, or return to the previous screen once it is cleared.
+function handleGlobalSearch(rawQuery) {
+    const query = rawQuery.trim();
     if (query === '') {
-        searchResults.innerHTML = `
-            <div class="empty-search-state">
-                <p>Search for your favorite songs</p>
-            </div>
-        `;
+        renderSearchResults('');
+        if (activeSection === 'search' && searchReturnSection) {
+            const returnSection = searchReturnSection;
+            searchReturnSection = null;
+            switchSection(returnSection);
+        }
+        return;
+    }
+    if (activeSection !== 'search') {
+        searchReturnSection = activeSection;
+        switchSection('search', { preserveWizard: true });
+    }
+    renderSearchResults(query);
+}
+
+// Search song titles using the B-Tree's compatibility scan and render animated cards.
+function renderSearchResults(query) {
+    const searchResults = document.getElementById('searchResults');
+    searchResults.replaceChildren();
+
+    if (query === '') {
+        searchResults.appendChild(createEmptySearchState('Search for your favorite songs'));
         return;
     }
 
@@ -844,51 +884,65 @@ function searchSongs(event) {
         return firstSong.title.toLowerCase().localeCompare(secondSong.title.toLowerCase());
     });
     addVisualizationStep(`Searched for "${query}" in B-Tree - Found ${results.length} result(s)`);
-    
+
     if (results.length === 0) {
-        searchResults.innerHTML = `
-            <div class="empty-search-state">
-                <p>No results found for "${query}".</p>
-            </div>
-        `;
+        searchResults.appendChild(createEmptySearchState(`No results found for "${query}".`));
         return;
     }
 
-    searchResults.innerHTML = results.map(song => `
-        <div class="search-result-item" onclick="addSongToPlaylist('${song.track_id}')">
-            <div class="search-result-info">
-                <div class="search-result-title">${song.title}</div>
-                <div class="search-result-artist">${song.artist}</div>
-            </div>
-            <div class="search-result-rating">Rating: ${song.rating}</div>
-        </div>
-    `).join('');
+    const grid = document.createElement('div');
+    grid.className = 'search-results-grid';
+    results.forEach((song, index) => {
+        const card = document.createElement('article');
+        card.className = 'search-result-card';
+        // Only the first cards are staggered so long result lists still appear quickly.
+        card.style.setProperty('--card-index', String(Math.min(index, SEARCH_STAGGER_LIMIT)));
+
+        const title = document.createElement('h3');
+        title.className = 'search-result-title';
+        title.textContent = song.title || song.track_name || 'Untitled';
+        card.appendChild(title);
+
+        const artist = document.createElement('p');
+        artist.className = 'search-result-artist';
+        artist.textContent = song.artist || song.artists || 'Unknown artist';
+        card.appendChild(artist);
+
+        const genre = document.createElement('p');
+        genre.className = 'search-result-genre';
+        genre.textContent = song.track_genre || 'Genre not available';
+        card.appendChild(genre);
+
+        const addButton = document.createElement('button');
+        addButton.className = 'btn-secondary btn-small search-result-add';
+        addButton.type = 'button';
+        addButton.textContent = 'Add to queue';
+        addButton.addEventListener('click', () => addSongToPlaylist(song.track_id));
+        card.appendChild(addButton);
+        grid.appendChild(card);
+    });
+    searchResults.appendChild(grid);
+}
+
+// Build the centered message used for empty and no-match search states.
+function createEmptySearchState(text) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'empty-search-state';
+    const message = document.createElement('p');
+    message.textContent = text;
+    emptyState.appendChild(message);
+    return emptyState;
 }
 
 // Add searched song to playlist
 function addSongToPlaylist(songId) {
     const song = songCatalog.search(songId);
-    
+
     if (song) {
         playlist.enqueue(song);
-        updateNowPlaying();
         updateQueueStatus();
         addVisualizationStep(`✓ Added "${song.title}" to playlist from search`);
         showNotification(`Added "${song.title}" to playlist!`);
-    }
-}
-
-// Set current song
-function setCurrentSong(index) {
-    const songs = playlist.getAllSongs();
-    if (songs[index]) {
-        // Set the current index to the song's queue index
-        playlist.currentIndex = songs[index].index;
-        currentTime = 0;
-        updateNowPlaying();
-        if (isPlaying) {
-            startProgress();
-        }
     }
 }
 
@@ -928,7 +982,8 @@ function readSavedPlaylists() {
 }
 
 // Create one text-safe playlist card shared by Home and Library.
-function renderPlaylistCard(savedPlaylist) {
+// Library cards are openable and lead to the playlist detail view.
+function renderPlaylistCard(savedPlaylist, openable = false) {
     const card = document.createElement('article');
     card.className = 'saved-playlist-card';
 
@@ -942,6 +997,22 @@ function renderPlaylistCard(savedPlaylist) {
     count.textContent = `${savedPlaylist.songs.length} song${savedPlaylist.songs.length === 1 ? '' : 's'}`;
     card.appendChild(count);
 
+    if (openable) {
+        card.classList.add('saved-playlist-card-openable');
+        card.addEventListener('click', (event) => {
+            if (!event.target.closest('button')) {
+                openPlaylistDetail(savedPlaylist.id);
+            }
+        });
+        const openButton = document.createElement('button');
+        openButton.className = 'btn-secondary saved-playlist-open';
+        openButton.type = 'button';
+        openButton.textContent = 'Open';
+        openButton.setAttribute('aria-label', `Open playlist ${savedPlaylist.name}`);
+        openButton.addEventListener('click', () => openPlaylistDetail(savedPlaylist.id));
+        card.appendChild(openButton);
+    }
+
     const exportButton = document.createElement('button');
     exportButton.className = 'btn-youtube saved-playlist-export';
     exportButton.type = 'button';
@@ -953,7 +1024,7 @@ function renderPlaylistCard(savedPlaylist) {
 }
 
 // Render saved playlists or the shared empty/error state into either page.
-function renderSavedPlaylistCards(container) {
+function renderSavedPlaylistCards(container, openable = false) {
     const savedPlaylists = readSavedPlaylists();
     container.replaceChildren();
     if (savedPlaylists === null) {
@@ -982,7 +1053,7 @@ function renderSavedPlaylistCards(container) {
     }
 
     savedPlaylists.forEach((savedPlaylist) => {
-        container.appendChild(renderPlaylistCard(savedPlaylist));
+        container.appendChild(renderPlaylistCard(savedPlaylist, openable));
     });
 }
 
@@ -1031,7 +1102,7 @@ function updateLibraryDisplay() {
     const libraryStatus = document.getElementById('libraryStatus');
     libraryStatus.textContent = catalogLoadMessage;
     libraryStatus.hidden = catalogLoadMessage === '';
-    renderSavedPlaylistCards(document.getElementById('libraryDisplay'));
+    renderSavedPlaylistCards(document.getElementById('libraryDisplay'), true);
 }
 
 // Persist one playlist through the shared saved-playlist format and storage key.
@@ -1090,59 +1161,417 @@ function saveCurrentQueue() {
     return true;
 }
 
-// Update now playing display
-function updateNowPlaying() {
-    const current = playlist.getCurrent();
-    const nowPlayingSong = document.getElementById('nowPlayingSong');
-    const nowPlayingArtist = document.getElementById('nowPlayingArtist');
-    const timeTotal = document.getElementById('timeTotal');
-    
-    if (current) {
-        nowPlayingSong.textContent = current.title;
-        nowPlayingArtist.textContent = current.artist;
-        totalTime = current.duration;
-        timeTotal.textContent = formatDuration(current.duration);
-        updateProgressBar();
-    } else {
-        nowPlayingSong.textContent = 'Not playing';
-        nowPlayingArtist.textContent = '-';
-        totalTime = 0;
-        timeTotal.textContent = '0:00';
-        document.getElementById('timeCurrent').textContent = '0:00';
-        document.getElementById('progressFill').style.width = '0%';
+// Save an edited playlist in place under the same storage key the Library reads.
+function updateSavedPlaylist(updatedPlaylist) {
+    const savedPlaylists = readSavedPlaylists();
+    if (savedPlaylists === null) {
+        return { success: false, message: 'Saved playlists could not be accessed.' };
     }
+    const updated = PlaylistEditor.replacePlaylist(savedPlaylists, updatedPlaylist);
+    if (!updated.replaced) {
+        return { success: false, message: 'This playlist no longer exists.' };
+    }
+    try {
+        window.localStorage.setItem(
+            SAVED_PLAYLISTS_STORAGE_KEY,
+            JSON.stringify(updated.playlists)
+        );
+    } catch (error) {
+        console.error('Could not update playlist in localStorage:', error);
+        return { success: false, message: 'Playlist changes could not be saved in this browser.' };
+    }
+    return { success: true, message: '' };
 }
 
-// Update progress bar
-function updateProgressBar() {
-    if (totalTime === 0) return;
-    
-    const progress = (currentTime / totalTime) * 100;
-    document.getElementById('progressFill').style.width = progress + '%';
-    document.getElementById('timeCurrent').textContent = formatDuration(currentTime);
+// Find one saved playlist by ID, or null when storage or the ID is unavailable.
+function findSavedPlaylist(playlistId) {
+    const savedPlaylists = readSavedPlaylists();
+    if (savedPlaylists === null) {
+        return null;
+    }
+    return savedPlaylists.find((savedPlaylist) => savedPlaylist.id === playlistId) || null;
 }
 
-// Start progress simulation
-function startProgress() {
-    if (progressInterval) clearInterval(progressInterval);
-    
-    progressInterval = setInterval(() => {
-        if (isPlaying && currentTime < totalTime) {
-            currentTime++;
-            updateProgressBar();
-        } else if (currentTime >= totalTime) {
-            // Auto play next song
-            playNext();
+// Bind the playlist detail controls once; rows and search results bind their own buttons.
+function setupPlaylistDetailUI() {
+    document.getElementById('playlistDetailBack').addEventListener('click', closePlaylistDetail);
+    document.getElementById('playlistRenameButton').addEventListener('click', showRenameForm);
+    document.getElementById('playlistRenameForm').addEventListener('submit', submitPlaylistRename);
+    document.getElementById('playlistRenameCancel').addEventListener('click', hideRenameForm);
+    document.getElementById('playlistRenameInput').addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            hideRenameForm();
         }
-    }, 1000);
+    });
+    document.getElementById('playlistAddSongsToggle').addEventListener('click', toggleAddSongsPanel);
+    document.getElementById('playlistAddSearch').addEventListener('input', renderPlaylistAddResults);
+    document.getElementById('undoToastButton').addEventListener('click', undoLastRemoval);
 }
 
-// Stop progress simulation
-function stopProgress() {
-    if (progressInterval) {
-        clearInterval(progressInterval);
-        progressInterval = null;
+// Open a Library playlist in the detail view with its editors reset.
+function openPlaylistDetail(playlistId) {
+    if (!findSavedPlaylist(playlistId)) {
+        showNotification('That playlist could not be found.', 'error');
+        updateLibraryDisplay();
+        return false;
     }
+    openPlaylistId = playlistId;
+    document.getElementById('playlistRenameForm').hidden = true;
+    document.getElementById('playlistNameView').hidden = false;
+    document.getElementById('playlistAddPanel').hidden = true;
+    document.getElementById('playlistAddSongsToggle').setAttribute('aria-expanded', 'false');
+    document.getElementById('playlistAddSongsToggle').textContent = 'Add songs';
+    document.getElementById('playlistAddSearch').value = '';
+    setPlaylistDetailMessage('');
+    switchSection('playlist');
+    document.getElementById('playlistDetailBack').focus();
+    return true;
+}
+
+// Leave the detail view and show the refreshed Library.
+function closePlaylistDetail() {
+    openPlaylistId = null;
+    switchSection('library');
+}
+
+// Show a short inline status or validation message in the detail view.
+function setPlaylistDetailMessage(message) {
+    document.getElementById('playlistDetailMessage').textContent = message;
+}
+
+// Render the open playlist's header, song rows, and add-song results from storage.
+function renderPlaylistDetail() {
+    const savedPlaylist = openPlaylistId ? findSavedPlaylist(openPlaylistId) : null;
+    const songList = document.getElementById('playlistDetailSongs');
+    songList.replaceChildren();
+    if (!savedPlaylist) {
+        document.getElementById('playlistDetailName').textContent = 'Playlist not found';
+        document.getElementById('playlistDetailCount').textContent = '';
+        document.getElementById('playlistRenameButton').disabled = true;
+        document.getElementById('playlistAddSongsToggle').disabled = true;
+        return;
+    }
+    document.getElementById('playlistRenameButton').disabled = false;
+    document.getElementById('playlistAddSongsToggle').disabled = false;
+    document.getElementById('playlistDetailName').textContent = savedPlaylist.name;
+    const songCount = savedPlaylist.songs.length;
+    document.getElementById('playlistDetailCount').textContent =
+        `${songCount} song${songCount === 1 ? '' : 's'}`;
+
+    if (songCount === 0) {
+        const emptyState = document.createElement('li');
+        emptyState.className = 'empty-state playlist-detail-empty';
+        emptyState.textContent = 'This playlist is empty. Use "Add songs" to find tracks.';
+        songList.appendChild(emptyState);
+    }
+    savedPlaylist.songs.forEach((song, index) => {
+        songList.appendChild(renderPlaylistSongRow(song, index, songCount));
+    });
+    if (!document.getElementById('playlistAddPanel').hidden) {
+        renderPlaylistAddResults();
+    }
+}
+
+// Build one draggable song row with move up/down and remove controls.
+function renderPlaylistSongRow(song, index, songCount) {
+    const title = song.title || song.track_name || 'Untitled';
+    const row = document.createElement('li');
+    row.className = 'playlist-song-row';
+    row.draggable = true;
+
+    const handle = document.createElement('span');
+    handle.className = 'playlist-song-handle';
+    handle.setAttribute('aria-hidden', 'true');
+    handle.textContent = '⋮⋮';
+    row.appendChild(handle);
+
+    const position = document.createElement('span');
+    position.className = 'playlist-song-position';
+    position.textContent = String(index + 1);
+    row.appendChild(position);
+
+    const info = document.createElement('div');
+    info.className = 'playlist-song-info';
+    const titleText = document.createElement('span');
+    titleText.className = 'playlist-song-title';
+    titleText.textContent = title;
+    const artistText = document.createElement('span');
+    artistText.className = 'playlist-song-artist';
+    artistText.textContent = song.artist || song.artists || 'Unknown artist';
+    info.appendChild(titleText);
+    info.appendChild(artistText);
+    row.appendChild(info);
+
+    const actions = document.createElement('div');
+    actions.className = 'playlist-song-actions';
+    [
+        ['move-up', '↑', `Move ${title} up`, index === 0, () => moveSongInOpenPlaylist(index, index - 1, 'move-up')],
+        ['move-down', '↓', `Move ${title} down`, index === songCount - 1, () => moveSongInOpenPlaylist(index, index + 1, 'move-down')],
+        ['remove', '✕', `Remove ${title}`, false, () => removeSongFromOpenPlaylist(index)]
+    ].forEach(([action, label, ariaLabel, disabled, handler]) => {
+        const button = document.createElement('button');
+        button.className = `playlist-song-btn playlist-song-${action}`;
+        button.type = 'button';
+        button.textContent = label;
+        button.title = ariaLabel;
+        button.setAttribute('aria-label', ariaLabel);
+        button.disabled = disabled;
+        button.addEventListener('click', handler);
+        actions.appendChild(button);
+    });
+    row.appendChild(actions);
+
+    row.addEventListener('dragstart', (event) => {
+        dragSourceIndex = index;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', String(index));
+        row.classList.add('dragging');
+    });
+    row.addEventListener('dragover', (event) => {
+        if (dragSourceIndex === null) {
+            return;
+        }
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        row.classList.add('drag-over');
+    });
+    row.addEventListener('dragleave', (event) => {
+        if (!row.contains(event.relatedTarget)) {
+            row.classList.remove('drag-over');
+        }
+    });
+    row.addEventListener('drop', (event) => {
+        event.preventDefault();
+        row.classList.remove('drag-over');
+        const fromIndex = dragSourceIndex;
+        dragSourceIndex = null;
+        if (fromIndex !== null && fromIndex !== index) {
+            moveSongInOpenPlaylist(fromIndex, index);
+        }
+    });
+    row.addEventListener('dragend', () => {
+        dragSourceIndex = null;
+        row.classList.remove('dragging');
+        document.querySelectorAll('.playlist-song-row.drag-over').forEach((overRow) => {
+            overRow.classList.remove('drag-over');
+        });
+    });
+    return row;
+}
+
+// Persist a pure edit result and refresh every view that shows the playlist.
+function commitPlaylistEdit(result, errorMessages = {}) {
+    if (!result.ok) {
+        setPlaylistDetailMessage(errorMessages[result.error] || 'That change could not be made.');
+        return false;
+    }
+    const outcome = updateSavedPlaylist(result.playlist);
+    if (!outcome.success) {
+        setPlaylistDetailMessage(outcome.message);
+        return false;
+    }
+    setPlaylistDetailMessage('');
+    renderPlaylistDetail();
+    renderSavedPlaylistCards(document.getElementById('homePlaylistsDisplay'));
+    return true;
+}
+
+// Reorder the open playlist and keep focus on the moved song's matching control.
+function moveSongInOpenPlaylist(fromIndex, toIndex, focusAction = '') {
+    const savedPlaylist = findSavedPlaylist(openPlaylistId);
+    if (!savedPlaylist) {
+        renderPlaylistDetail();
+        return false;
+    }
+    const moved = commitPlaylistEdit(PlaylistEditor.moveSong(savedPlaylist, fromIndex, toIndex));
+    if (moved && focusAction) {
+        const rows = document.querySelectorAll('#playlistDetailSongs .playlist-song-row');
+        const button = rows[toIndex] && rows[toIndex].querySelector(`.playlist-song-${focusAction}`);
+        const fallback = rows[toIndex] && rows[toIndex].querySelector('.playlist-song-remove');
+        const target = button && !button.disabled ? button : fallback;
+        if (target) {
+            target.focus();
+        }
+    }
+    return moved;
+}
+
+// Remove one song and offer a short-lived undo.
+function removeSongFromOpenPlaylist(index) {
+    const savedPlaylist = findSavedPlaylist(openPlaylistId);
+    if (!savedPlaylist) {
+        renderPlaylistDetail();
+        return false;
+    }
+    const result = PlaylistEditor.removeSong(savedPlaylist, index);
+    if (!commitPlaylistEdit(result)) {
+        return false;
+    }
+    showUndoToast({ playlistId: savedPlaylist.id, song: result.removed, index: result.index });
+    return true;
+}
+
+// Show the undo toast for the latest removal; an older pending undo is dropped.
+function showUndoToast(removal) {
+    clearTimeout(undoToastTimer);
+    pendingUndo = removal;
+    const title = removal.song.title || removal.song.track_name || 'song';
+    document.getElementById('undoToastMessage').textContent = `Removed "${title}".`;
+    document.getElementById('undoToast').hidden = false;
+    undoToastTimer = setTimeout(hideUndoToast, UNDO_DURATION_MS);
+}
+
+// Hide the undo toast and make the last removal permanent.
+function hideUndoToast() {
+    clearTimeout(undoToastTimer);
+    undoToastTimer = null;
+    pendingUndo = null;
+    document.getElementById('undoToast').hidden = true;
+}
+
+// Put the most recently removed song back into its playlist.
+function undoLastRemoval() {
+    const removal = pendingUndo;
+    hideUndoToast();
+    if (!removal) {
+        return false;
+    }
+    const savedPlaylist = findSavedPlaylist(removal.playlistId);
+    if (!savedPlaylist) {
+        showNotification('That playlist no longer exists.', 'error');
+        return false;
+    }
+    const result = PlaylistEditor.restoreSong(savedPlaylist, removal.song, removal.index);
+    if (!result.ok) {
+        showNotification('The song could not be restored.', 'error');
+        return false;
+    }
+    const outcome = updateSavedPlaylist(result.playlist);
+    if (!outcome.success) {
+        showNotification(outcome.message, 'error');
+        return false;
+    }
+    if (activeSection === 'playlist' && openPlaylistId === removal.playlistId) {
+        renderPlaylistDetail();
+    }
+    renderSavedPlaylistCards(document.getElementById('homePlaylistsDisplay'));
+    return true;
+}
+
+// Swap the playlist title for an inline rename field.
+function showRenameForm() {
+    const savedPlaylist = findSavedPlaylist(openPlaylistId);
+    if (!savedPlaylist) {
+        return;
+    }
+    const input = document.getElementById('playlistRenameInput');
+    input.value = savedPlaylist.name;
+    document.getElementById('playlistNameView').hidden = true;
+    document.getElementById('playlistRenameForm').hidden = false;
+    input.focus();
+    input.select();
+}
+
+// Restore the playlist title without saving the rename field.
+function hideRenameForm() {
+    document.getElementById('playlistRenameForm').hidden = true;
+    document.getElementById('playlistNameView').hidden = false;
+    document.getElementById('playlistRenameButton').focus();
+}
+
+// Save a trimmed, non-empty playlist name.
+function submitPlaylistRename(event) {
+    event.preventDefault();
+    const savedPlaylist = findSavedPlaylist(openPlaylistId);
+    if (!savedPlaylist) {
+        renderPlaylistDetail();
+        return false;
+    }
+    const renamed = commitPlaylistEdit(
+        PlaylistEditor.renamePlaylist(savedPlaylist, document.getElementById('playlistRenameInput').value),
+        {
+            'empty-name': 'Playlist name cannot be empty.',
+            'name-too-long': `Playlist name must be ${PlaylistEditor.MAX_PLAYLIST_NAME_LENGTH} characters or fewer.`
+        }
+    );
+    if (!renamed) {
+        document.getElementById('playlistRenameInput').focus();
+        return false;
+    }
+    hideRenameForm();
+    return true;
+}
+
+// Open or close the add-songs search panel.
+function toggleAddSongsPanel() {
+    const panel = document.getElementById('playlistAddPanel');
+    const toggle = document.getElementById('playlistAddSongsToggle');
+    panel.hidden = !panel.hidden;
+    toggle.setAttribute('aria-expanded', String(!panel.hidden));
+    toggle.textContent = panel.hidden ? 'Add songs' : 'Done adding';
+    if (!panel.hidden) {
+        renderPlaylistAddResults();
+        document.getElementById('playlistAddSearch').focus();
+    }
+}
+
+// Search the catalog with the shared title/artist helper and mark songs already added.
+function renderPlaylistAddResults() {
+    const query = document.getElementById('playlistAddSearch').value;
+    const resultList = document.getElementById('playlistAddResults');
+    const status = document.getElementById('playlistAddStatus');
+    const savedPlaylist = findSavedPlaylist(openPlaylistId);
+    resultList.replaceChildren();
+    if (!savedPlaylist) {
+        status.textContent = 'This playlist could not be loaded.';
+        return;
+    }
+    if (query.trim() === '') {
+        status.textContent = 'Enter a title or artist to find songs.';
+        return;
+    }
+    const results = PlaylistUI.findSongsByName(songIndex.songs, query, PLAYLIST_ADD_SEARCH_LIMIT);
+    status.textContent = results.totalMatches === 0
+        ? 'No songs match that title or artist.'
+        : `Showing ${results.shown} of ${results.totalMatches} matches.`;
+    results.songs.forEach((song) => {
+        const isAdded = PlaylistEditor.hasSong(savedPlaylist, song.track_id);
+        const item = document.createElement('li');
+        item.className = 'playlist-add-result';
+
+        const label = document.createElement('span');
+        label.className = 'playlist-add-label';
+        label.textContent = `${song.title || song.track_name || 'Untitled'} — ${song.artist || song.artists || 'Unknown artist'}`;
+        item.appendChild(label);
+
+        const addButton = document.createElement('button');
+        addButton.className = 'btn-secondary btn-small';
+        addButton.type = 'button';
+        addButton.textContent = isAdded ? 'Added' : 'Add';
+        addButton.disabled = isAdded;
+        addButton.addEventListener('click', () => addSongToOpenPlaylist(song.track_id));
+        item.appendChild(addButton);
+        resultList.appendChild(item);
+    });
+}
+
+// Add one catalog song to the open playlist, refusing duplicates.
+function addSongToOpenPlaylist(trackId) {
+    const savedPlaylist = findSavedPlaylist(openPlaylistId);
+    const song = songCatalog.search(trackId);
+    if (!savedPlaylist || !song) {
+        setPlaylistDetailMessage('That song could not be added.');
+        return false;
+    }
+    const added = commitPlaylistEdit(PlaylistEditor.addSong(savedPlaylist, song), {
+        duplicate: 'That song is already in this playlist.'
+    });
+    if (added) {
+        setPlaylistDetailMessage(`Added "${song.title || song.track_name || 'song'}".`);
+        document.getElementById('playlistAddSearch').focus();
+    }
+    return added;
 }
 
 // Shuffle playlist using heap sort
@@ -1164,7 +1593,6 @@ function shufflePlaylist() {
         playlist.enqueue(song);
     });
     
-    updateNowPlaying();
     updateQueueStatus();
     showNotification('Playlist shuffled using heap sort!');
 }
@@ -1177,76 +1605,9 @@ function clearPlaylist() {
     }
 
     playlist.clear();
-    currentTime = 0;
-    stopProgress();
-    updateNowPlaying();
     updateQueueStatus();
     addVisualizationStep('Cleared playlist');
     showNotification('Playlist cleared!');
-}
-
-// Play/Pause functionality
-function playPause() {
-    if (playlist.isEmpty()) {
-        showNotification('No songs in playlist!', 'error');
-        return;
-    }
-
-    isPlaying = !isPlaying;
-    const current = playlist.getCurrent();
-    const playPauseBtn = document.getElementById('playPauseBtn');
-    
-    if (isPlaying) {
-        playPauseBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"></path></svg>';
-        playPauseBtn.setAttribute('aria-label', 'Pause');
-        addVisualizationStep(`Playing: "${current.title}"`);
-        showNotification('Playing: ' + current.title);
-        startProgress();
-    } else {
-        playPauseBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7z"></path></svg>';
-        playPauseBtn.setAttribute('aria-label', 'Play');
-        addVisualizationStep(`Paused: "${current.title}"`);
-        showNotification('Paused: ' + current.title);
-        stopProgress();
-    }
-}
-
-// Play next song
-function playNext() {
-    if (playlist.isEmpty()) {
-        showNotification('No songs in playlist!', 'error');
-        return;
-    }
-
-    const next = playlist.next();
-    if (next) {
-        currentTime = 0;
-        addVisualizationStep(`Next: "${next.title}" (Circular Queue navigation)`);
-        updateNowPlaying();
-        if (isPlaying) {
-            showNotification('Playing: ' + next.title);
-            startProgress();
-        }
-    }
-}
-
-// Play previous song
-function playPrevious() {
-    if (playlist.isEmpty()) {
-        showNotification('No songs in playlist!', 'error');
-        return;
-    }
-
-    const previous = playlist.previous();
-    if (previous) {
-        currentTime = 0;
-        addVisualizationStep(`Previous: "${previous.title}" (Circular Queue navigation)`);
-        updateNowPlaying();
-        if (isPlaying) {
-            showNotification('Playing: ' + previous.title);
-            startProgress();
-        }
-    }
 }
 
 // Update queue status
@@ -1315,13 +1676,6 @@ function showNotification(message, type = 'success') {
     }, 3000);
 }
 
-// Format duration in seconds to MM:SS
-function formatDuration(seconds) {
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
-}
-
 // Add animation styles
 const style = document.createElement('style');
 style.textContent = `
@@ -1349,36 +1703,20 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// Progress bar click handler
-function setupProgressBar() {
-    const progressBar = document.querySelector('.progress-bar');
-    if (progressBar) {
-        progressBar.addEventListener('click', (e) => {
-            if (totalTime === 0) return;
-            
-            const rect = progressBar.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            const percentage = clickX / rect.width;
-            currentTime = Math.floor(totalTime * percentage);
-            updateProgressBar();
-        });
-    }
-}
-
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.songGraph = null;
     window.playlistGenerator = null;
     updateLibraryDisplay();
     updateQueueStatus();
-    updateNowPlaying();
     const csvLoadPromise = loadCSVSongs();
     setupMenu();
     setupNavigation();
     setupPlaylistSavingUI();
     setupYouTubeExportUI();
     setupPlaylistGeneratorUI();
-    setupProgressBar();
+    setupPlaylistDetailUI();
+    setupGlobalSearch();
     addVisualizationStep('GenMix initialized');
     addVisualizationStep('DSA structures: B-Tree, Circular Queue, Max Heap ready');
     
