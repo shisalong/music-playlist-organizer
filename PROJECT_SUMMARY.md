@@ -1,22 +1,26 @@
-# 📋 Project Summary - Music Playlist Organizer
+# GenMix - Project Summary
 
 ## 🎯 Project Overview
 
-**Music Playlist Organizer** is a fully functional web application demonstrating Data Structures and Algorithms (DSA) in a practical, interactive format. The project showcases how fundamental computer science concepts can be applied to solve real-world problems.
+**GenMix** is a web application demonstrating Data Structures and Algorithms (DSA) in a practical, interactive format. The project showcases how fundamental computer science concepts can be applied to solve real-world problems.
 
 ## ✅ Project Requirements Met
 
 ### Working Prototype ✓
 - Fully functional web application
 - Interactive user interface
-- Real-time updates and visualizations
+- Real-time operation visualizations
 - Mobile-responsive design
 
 ### DSA Algorithms Implemented ✓
 1. **B-Tree** - Song catalog indexed by track ID
 2. **Circular Queue** - Playlist playback
-3. **Priority Queue (Max Heap)** - Recommendations
+3. **Priority Queue (Max Heap)** - Priority-based song retrieval
 4. **Heap Sort** - Playlist sorting
+5. **Song Similarity Graph** - Directed, weighted top-k audio-feature neighbors with BFS/DFS
+6. **Smart Playlist Generator** - Seed expansion and data-driven mood filtering
+
+The startup catalog is loaded from `songs_cleaned.csv` (up to 5,000 data rows). No hardcoded demo songs are inserted; an unavailable or empty CSV leaves the library empty and displays a message.
 
 ### Practical Application ✓
 - Demonstrates algorithms solving real problems
@@ -109,7 +113,7 @@ Operation: O(1) for all navigations
 **Visual Example:**
 ```
 Heap Structure:
-        10 (Bohemian Rhapsody)
+        10 (Highest-rated song)
        /  \
       9    9
      / \  / \
@@ -123,7 +127,7 @@ Root always contains maximum
 - Priority-based ordering
 - Heap property maintenance
 - O(log n) insert/extract
-- Perfect for recommendations
+- Supports efficient priority-based selection
 
 ### 4. Heap Sort
 **Process:**
@@ -153,12 +157,13 @@ Sorted: [10, 9, 8, 7, 6]
 - ✅ Mobile-friendly
 
 ### Functionality
-- ✅ Add/Remove songs
-- ✅ Search catalog
-- ✅ Play/Pause/Next/Previous
-- ✅ Shuffle playlist
-- ✅ View recommendations
-- ✅ Real-time statistics
+- ✅ Search the CSV-backed catalog
+- ✅ Save named current-queue snapshots in browser localStorage
+- ✅ View saved playlist names and song counts on Home and Library
+- ✅ Generate seed-based and mood-based playlists
+- ✅ Guide creation with a multi-step wizard and explicit Save/Delete actions
+- ✅ Simulated queue controls (no audio playback)
+- ✅ View random recommendations from real catalog songs
 - ✅ Algorithm visualizations
 
 ### Educational Features
@@ -221,13 +226,21 @@ Open browser at `http://localhost:3000`
 ## 📁 Project Structure
 
 ```
-Music Playlist Organizer/
+GenMix/
 ├── index.html          # Main application UI
 ├── styles.css          # Styling and design
 ├── dsa.js             # DSA implementations
 ├── app.js             # Application logic
+├── playlistGenerator.js # Seed and mood playlist generation
+├── playlistUI.js       # Playlist UI search and display helpers
+├── playlistWizard.js   # Pure wizard transitions and save-shape helpers
 ├── songs_cleaned.csv  # Catalog dataset (first 5,000 rows loaded)
 ├── btree.test.js      # Standalone B-Tree and CSV tests
+├── graph.test.js      # Standalone SongGraph tests
+├── playlistGenerator.test.js # Playlist generator tests
+├── playlistUI.test.js # Playlist UI helper tests
+├── playlistWizard.test.js # Playlist wizard logic tests
+├── app.test.js        # CSV startup and generator integration tests
 ├── package.json       # Configuration
 ├── README.md          # Full documentation
 ├── QUICK_START.md     # Quick reference
@@ -265,7 +278,7 @@ Potential enhancements for future:
 
 ## 📝 Conclusion
 
-This Music Playlist Organizer successfully demonstrates:
+GenMix successfully demonstrates:
 - **Multiple DSA algorithms** in a single application
 - **Practical implementation** of theoretical concepts
 - **Real-world application** of computer science principles

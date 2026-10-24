@@ -3,101 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Music Playlist Organizer</title>
+    <meta name="description" content="GenMix is a music catalog and playlist organizer built with data structures and algorithms.">
+    <title>GenMix</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
 </head>
 <body>
-    <!-- Left Sidebar -->
-    <aside class="sidebar">
-        <div class="sidebar-content">
-            <div class="logo">
-                <span class="logo-icon">🎵</span>
-                <span class="logo-text">Music Organizer</span>
-            </div>
-            
-            <nav class="sidebar-nav">
-                <a href="#" class="nav-item active" data-section="home">
-                    <span class="nav-icon">🏠</span>
-                    <span class="nav-text">Home</span>
-                </a>
-                <a href="#" class="nav-item" data-section="search">
-                    <span class="nav-icon">🔍</span>
-                    <span class="nav-text">Search</span>
-                </a>
-                <a href="#" class="nav-item" data-section="library">
-                    <span class="nav-icon">📚</span>
-                    <span class="nav-text">Your Library</span>
-                </a>
-            </nav>
+    <!-- Keep the menu button outside the content that blurs when the menu opens. -->
+    <button
+        id="menuToggle"
+        class="menu-toggle"
+        type="button"
+        aria-label="Open menu"
+        aria-expanded="false"
+        aria-controls="mainMenu"
+    >
+        <span class="hamburger-icon" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+        </span>
+    </button>
 
-            <div class="sidebar-divider"></div>
-
-            <div class="sidebar-section">
-                <h3 class="sidebar-title">Playlist</h3>
-                <div class="playlist-info">
-                    <span id="playlistCount" class="playlist-count">0 songs</span>
-                </div>
-            </div>
-
-            <div class="sidebar-stats">
-                <div class="stat-mini">
-                    <span class="stat-label">Total Songs</span>
-                    <span id="totalSongs" class="stat-value">0</span>
-                </div>
-                <div class="stat-mini">
-                    <span class="stat-label">B-Tree Height</span>
-                    <span id="btreeHeight" class="stat-value">0</span>
-                </div>
-            </div>
+    <!-- Keep the brand and catalog search visible in the page header. -->
+    <header id="appHeader" class="top-bar">
+        <span class="header-wordmark">GenMix</span>
+        <div class="search-container">
+            <button class="search-btn" type="button" aria-label="Search songs">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="10.8" cy="10.8" r="6.6"></circle>
+                    <path d="m16 16 4.5 4.5"></path>
+                </svg>
+            </button>
+            <input type="text" id="searchInput" class="search-input" placeholder="Search for songs..." onkeyup="searchSongs(event)">
         </div>
+    </header>
+
+    <!-- The overlay receives outside clicks; the menu remains above it. -->
+    <button id="menuOverlay" class="menu-overlay" type="button" aria-label="Close menu" aria-hidden="true" tabindex="-1"></button>
+
+    <!-- The navigation panel stays mounted so its slide transition can finish. -->
+    <aside id="mainMenu" class="menu-panel" aria-label="Main menu" aria-hidden="true" inert>
+        <div class="menu-brand">GenMix</div>
+        <nav class="sidebar-nav" aria-label="Primary navigation">
+            <a href="#homeSection" class="nav-item active" data-section="home" aria-current="page">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m3 10 9-7 9 7"></path>
+                    <path d="M5.5 9v11h13V9M9.5 20v-6h5v6"></path>
+                </svg>
+                <span class="nav-text">Home</span>
+            </a>
+            <a href="#searchSection" class="nav-item" data-section="search">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="10.8" cy="10.8" r="6.6"></circle>
+                    <path d="m16 16 4.5 4.5"></path>
+                </svg>
+                <span class="nav-text">Search</span>
+            </a>
+            <a href="#librarySection" class="nav-item" data-section="library">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 4.5h12.5v15H4zM8 4.5V3h12v15h-3.5"></path>
+                    <path d="M7 8h6.5M7 11h6.5M7 14h4.5"></path>
+                </svg>
+                <span class="nav-text">Library</span>
+            </a>
+            <a href="#generatorSection" class="nav-item" data-section="generator">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path>
+                    <path d="m7.2 7.2 2.1 2.1m5.4 5.4 2.1 2.1m0-9.6-2.1 2.1m-5.4 5.4-2.1 2.1"></path>
+                    <path d="m12 8 1.2 2.8L16 12l-2.8 1.2L12 16l-1.2-2.8L8 12l2.8-1.2z"></path>
+                </svg>
+                <span class="nav-text">Generate</span>
+            </a>
+        </nav>
     </aside>
 
     <!-- Main Content -->
-    <main class="main-content">
-        <!-- Top Bar -->
-        <header class="top-bar">
-            <div class="search-container">
-                <button class="search-btn">
-                    <span>🔍</span>
-                </button>
-                <input type="text" id="searchInput" class="search-input" placeholder="Search for songs..." onkeyup="searchSongs(event)">
-            </div>
-            <div class="top-bar-actions">
-                <button class="btn-icon" onclick="showAddSongModal()" title="Add Song">
-                    <span>➕</span>
-                </button>
-            </div>
-        </header>
-
+    <main class="main-content" id="mainContent">
         <!-- Content Area -->
         <div class="content-wrapper">
             <!-- Home Section -->
             <section id="homeSection" class="content-section active">
-                <div class="section-header">
-                    <h1>Good evening</h1>
-                    <div class="section-actions">
-                        <button class="btn-secondary" onclick="shufflePlaylist()">🔀 Shuffle</button>
-                        <button class="btn-secondary" onclick="clearPlaylist()">🗑️ Clear</button>
-                    </div>
-                </div>
-
-                <!-- Recently Played / Recommendations -->
-                <div class="cards-grid">
-                    <div class="recommendations-card">
-                        <h2 class="card-title">⭐ Top Recommendations</h2>
-                        <div id="recommendationsDisplay" class="recommendations-list">
-                            <p class="empty-state">No recommendations yet</p>
+                <div class="home-sections">
+                    <section class="dashboard-section" aria-labelledby="recommendationsHeading">
+                        <div class="dashboard-section-header">
+                            <h1 id="recommendationsHeading">Top Recommendations</h1>
+                            <button id="refreshRecommendationsButton" class="btn-secondary" type="button">
+                                Refresh
+                            </button>
                         </div>
-                    </div>
-                </div>
+                        <div id="recommendationsDisplay" class="recommendation-grid"></div>
+                    </section>
 
-                <!-- Playlist Display -->
-                <div class="playlist-section">
-                    <h2 class="section-title">Your Playlist</h2>
-                    <div id="playlistDisplay" class="songs-list">
-                        <p class="empty-state">Your playlist is empty. Add some songs!</p>
-                    </div>
+                    <section class="dashboard-section" aria-labelledby="homePlaylistsHeading">
+                        <h2 id="homePlaylistsHeading">Your Playlists</h2>
+                        <div class="playlist-save-controls">
+                            <label for="playlistNameInput">Save current queue</label>
+                            <div class="playlist-save-form">
+                                <input
+                                    id="playlistNameInput"
+                                    class="playlist-name-input"
+                                    type="text"
+                                    maxlength="80"
+                                    placeholder="Enter a playlist name"
+                                    autocomplete="off"
+                                >
+                                <button id="saveQueuePlaylistButton" class="btn-primary" type="button" disabled>
+                                    Save playlist
+                                </button>
+                            </div>
+                        </div>
+                        <div id="homePlaylistsDisplay" class="playlist-grid"></div>
+                    </section>
                 </div>
             </section>
 
@@ -108,7 +125,6 @@
                 </div>
                 <div id="searchResults" class="search-results-container">
                     <div class="empty-search-state">
-                        <span class="empty-icon">🔍</span>
                         <p>Search for your favorite songs</p>
                     </div>
                 </div>
@@ -119,38 +135,175 @@
                 <div class="section-header">
                     <h1>Your Library</h1>
                 </div>
-                <div id="libraryDisplay" class="songs-grid">
-                    <p class="empty-state">No songs in library yet</p>
+                <p id="libraryStatus" class="library-status" role="status" hidden></p>
+                <div id="libraryDisplay" class="playlist-grid"></div>
+            </section>
+
+            <!-- Playlist Generator Section -->
+            <section id="generatorSection" class="content-section">
+                <div class="section-header">
+                    <div>
+                        <h1>Playlist Generator</h1>
+                        <p class="generator-intro">Build a playlist from a seed song or a mood.</p>
+                    </div>
+                </div>
+                <div class="generator-wizard" id="generatorWizard">
+                    <section id="wizardStartPanel" class="wizard-panel" aria-labelledby="wizardStartHeading">
+                        <h2 id="wizardStartHeading" tabindex="-1">Create a playlist your way</h2>
+                        <p>Choose a song or a mood and GenMix will build a playlist from your catalog.</p>
+                        <button id="createPlaylistButton" class="btn-primary create-playlist-button" type="button">
+                            Create Playlist
+                        </button>
+                    </section>
+
+                    <section id="wizardNamePanel" class="wizard-panel" aria-labelledby="wizardNameHeading" hidden>
+                        <p class="wizard-step-indicator">Step 1 of 4</p>
+                        <h2 id="wizardNameHeading" tabindex="-1">Name your playlist</h2>
+                        <form id="wizardNameForm" novalidate>
+                            <label for="wizardNameInput">Playlist name</label>
+                            <input id="wizardNameInput" class="generator-input" type="text" maxlength="60" autocomplete="off">
+                            <p id="wizardNameError" class="wizard-message" aria-live="polite"></p>
+                            <div class="wizard-actions">
+                                <button class="btn-primary" type="submit">Next</button>
+                                <button id="wizardNameCancel" class="btn-secondary" type="button">Cancel</button>
+                            </div>
+                        </form>
+                    </section>
+
+                    <section id="wizardMethodPanel" class="wizard-panel" aria-labelledby="wizardMethodHeading" hidden>
+                        <p class="wizard-step-indicator">Step 2 of 4</p>
+                        <h2 id="wizardMethodHeading" tabindex="-1">Choose how to build it</h2>
+                        <p>Playlist name: <strong id="wizardChosenName"></strong></p>
+                        <p id="wizardMethodEmptyMessage" class="empty-state" role="status" hidden></p>
+                        <div class="wizard-method-options">
+                            <button id="wizardSongMethod" class="wizard-option-card" type="button">
+                                <strong>Pick a Song</strong>
+                                <span>Find tracks similar to a song you choose.</span>
+                            </button>
+                            <button id="wizardMoodMethod" class="wizard-option-card" type="button">
+                                <strong>Pick a Mood</strong>
+                                <span>Build around one of the catalog's available moods.</span>
+                            </button>
+                        </div>
+                        <div class="wizard-actions">
+                            <button id="wizardMethodBack" class="btn-secondary" type="button">Back</button>
+                            <button id="wizardMethodCancel" class="btn-secondary" type="button">Cancel</button>
+                        </div>
+                    </section>
+
+                    <section id="wizardSongPanel" class="wizard-panel" aria-labelledby="wizardSongHeading" hidden>
+                        <p class="wizard-step-indicator">Step 3 of 4</p>
+                        <h2 id="wizardSongHeading" tabindex="-1">Choose a seed song</h2>
+                        <label for="wizardSongSearch">Search by song title or artist</label>
+                        <input
+                            id="wizardSongSearch"
+                            class="generator-input"
+                            type="search"
+                            placeholder="Type a title or artist"
+                            autocomplete="off"
+                        >
+                        <p id="wizardSongSearchStatus" class="generator-status" aria-live="polite">
+                            Enter a title or artist to find a seed song.
+                        </p>
+                        <div id="wizardSongResults" class="generator-seed-results"></div>
+                        <p id="wizardSelectedSeed" class="generator-selected-seed" aria-live="polite">No seed song selected.</p>
+                        <div class="wizard-actions">
+                            <button id="wizardSongGenerate" class="btn-primary" type="button" disabled>Generate</button>
+                            <button id="wizardSongBack" class="btn-secondary" type="button">Back</button>
+                            <button id="wizardSongCancel" class="btn-secondary" type="button">Cancel</button>
+                        </div>
+                    </section>
+
+                    <section id="wizardMoodPanel" class="wizard-panel" aria-labelledby="wizardMoodHeading" hidden>
+                        <p class="wizard-step-indicator">Step 3 of 4</p>
+                        <h2 id="wizardMoodHeading" tabindex="-1">Choose a mood</h2>
+                        <div id="wizardMoodOptions" class="wizard-mood-options" role="radiogroup" aria-labelledby="wizardMoodHeading"></div>
+                        <div class="wizard-actions">
+                            <button id="wizardMoodGenerate" class="btn-primary" type="button" disabled>Generate</button>
+                            <button id="wizardMoodBack" class="btn-secondary" type="button">Back</button>
+                            <button id="wizardMoodCancel" class="btn-secondary" type="button">Cancel</button>
+                        </div>
+                    </section>
+
+                    <section id="wizardLoadingPanel" class="wizard-panel wizard-loading-panel" aria-labelledby="wizardLoadingHeading" hidden>
+                        <div class="wizard-spinner" aria-hidden="true"></div>
+                        <h2 id="wizardLoadingHeading" tabindex="-1">Building your playlist</h2>
+                        <p id="wizardLoadingStatus" role="status" aria-live="polite">Finding songs from your catalog...</p>
+                        <button id="wizardLoadingCancel" class="btn-secondary" type="button">Cancel</button>
+                    </section>
+
+                    <section id="wizardResultPanel" class="wizard-panel wizard-result-panel" aria-labelledby="wizardResultHeading" hidden>
+                        <p class="wizard-step-indicator">Step 4 of 4</p>
+                        <h2 id="wizardResultHeading" tabindex="-1"></h2>
+                        <p id="wizardResultSummary" class="generator-status" aria-live="polite"></p>
+                        <p id="wizardResultMessage" class="generator-result-message" role="status"></p>
+                        <div id="wizardResultsTable" class="generator-table-wrapper"></div>
+                        <p id="wizardSaveStatus" class="wizard-message" role="status" aria-live="polite"></p>
+                        <div id="wizardResultActions" class="wizard-actions">
+                            <button id="wizardSaveButton" class="btn-primary" type="button">Save to Library</button>
+                            <button id="wizardDeleteButton" class="btn-secondary" type="button">Delete Playlist</button>
+                        </div>
+                        <div id="wizardDeleteConfirmation" class="wizard-confirmation" hidden>
+                            <span>Discard this playlist?</span>
+                            <button id="wizardDeleteConfirm" class="btn-secondary" type="button">Yes, discard</button>
+                            <button id="wizardDeleteKeep" class="btn-secondary" type="button">No, keep it</button>
+                        </div>
+                        <div id="wizardSavedActions" class="wizard-actions" hidden>
+                            <button id="wizardViewLibrary" class="btn-primary" type="button">View in Library</button>
+                            <button id="wizardCreateAnother" class="btn-secondary" type="button">Create another</button>
+                        </div>
+                        <div id="wizardEmptyResultActions" class="wizard-actions" hidden>
+                            <button id="wizardEmptyBack" class="btn-secondary" type="button">Back</button>
+                            <button id="wizardEmptyTryAgain" class="btn-primary" type="button">Try again</button>
+                        </div>
+                    </section>
+
+                    <section id="wizardErrorPanel" class="wizard-panel" aria-labelledby="wizardErrorHeading" hidden>
+                        <h2 id="wizardErrorHeading" tabindex="-1">Playlist generation failed</h2>
+                        <p id="wizardErrorMessage" class="wizard-message" role="alert"></p>
+                        <div class="wizard-actions">
+                            <button id="wizardRetryButton" class="btn-primary" type="button">Try again</button>
+                            <button id="wizardErrorStartButton" class="btn-secondary" type="button">Back to start</button>
+                        </div>
+                    </section>
                 </div>
             </section>
         </div>
     </main>
 
     <!-- Bottom Player Bar -->
-    <footer class="player-bar">
+    <footer class="player-bar" id="playerBar">
         <div class="player-info">
             <div class="now-playing-art">
-                <div class="art-placeholder">🎵</div>
+                <div class="art-placeholder" aria-hidden="true"></div>
             </div>
             <div class="now-playing-details">
                 <div id="nowPlayingSong" class="now-playing-title">Not playing</div>
                 <div class="now-playing-artist" id="nowPlayingArtist">-</div>
             </div>
-            <button class="like-btn" title="Like">
-                <span>❤️</span>
+            <button class="like-btn" type="button" title="Like" aria-label="Like">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M20.5 8.5c0 5-8.5 11-8.5 11s-8.5-6-8.5-11a4.5 4.5 0 0 1 8.5-2.2 4.5 4.5 0 0 1 8.5 2.2Z"></path>
+                </svg>
             </button>
         </div>
 
         <div class="player-controls">
             <div class="control-buttons">
-                <button class="control-btn" onclick="playPrevious()" title="Previous">
-                    <span>⏮️</span>
+                <button class="control-btn" type="button" onclick="playPrevious()" title="Previous" aria-label="Previous song">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 5v14M19 6 8 12l11 6z"></path>
+                    </svg>
                 </button>
-                <button class="control-btn play-btn" id="playPauseBtn" onclick="playPause()" title="Play/Pause">
-                    <span>▶️</span>
+                <button class="control-btn play-btn" id="playPauseBtn" type="button" onclick="playPause()" title="Play/Pause" aria-label="Play or pause">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="m8 5 12 7-12 7z"></path>
+                    </svg>
                 </button>
-                <button class="control-btn" onclick="playNext()" title="Next">
-                    <span>⏭️</span>
+                <button class="control-btn" type="button" onclick="playNext()" title="Next" aria-label="Next song">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M19 5v14M5 6l11 6-11 6z"></path>
+                    </svg>
                 </button>
             </div>
             <div class="progress-bar-container">
@@ -164,42 +317,14 @@
 
         <div class="player-actions">
             <div class="queue-info" id="queueStatus">Queue: Empty</div>
-            <button class="action-btn" onclick="showVisualizer()" title="Visualizer">
-                <span>📊</span>
+            <button class="action-btn" type="button" onclick="showVisualizer()" title="Visualizer" aria-label="Open algorithm visualizer">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 19V5M4 19h16"></path>
+                    <path d="M8 16v-5m4 5V7m4 9v-8m4 8v-4"></path>
+                </svg>
             </button>
         </div>
     </footer>
-
-    <!-- Add Song Modal -->
-    <div id="addSongModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Add New Song</h2>
-                <button class="modal-close" onclick="closeAddSongModal()">×</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Song Title</label>
-                    <input type="text" id="songTitle" placeholder="Enter song title">
-                </div>
-                <div class="form-group">
-                    <label>Artist</label>
-                    <input type="text" id="songArtist" placeholder="Enter artist name">
-                </div>
-                <div class="form-group-row">
-                    <div class="form-group">
-                        <label>Duration (seconds)</label>
-                        <input type="number" id="songDuration" placeholder="Duration" min="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Rating (1-10)</label>
-                        <input type="number" id="songRating" placeholder="Rating" min="1" max="10">
-                    </div>
-                </div>
-                <button class="btn-primary modal-submit" onclick="addSong()">Add Song</button>
-            </div>
-        </div>
-    </div>
 
     <!-- Visualizer Modal -->
     <div id="visualizerModal" class="modal">
@@ -217,6 +342,9 @@
     </div>
 
     <script src="dsa.js"></script>
+    <script src="playlistGenerator.js"></script>
+    <script src="playlistUI.js"></script>
+    <script src="playlistWizard.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

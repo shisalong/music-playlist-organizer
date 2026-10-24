@@ -1,15 +1,17 @@
-# 🎵 Music Playlist Organizer - DSA Project
+# GenMix - DSA Project
 
-A comprehensive music playlist management system demonstrating **Data Structures and Algorithms (DSA)** in a working prototype. This project showcases three fundamental data structures with practical applications.
+A comprehensive music playlist management system demonstrating **Data Structures and Algorithms (DSA)** in a working prototype. This project showcases several structures and algorithms with practical applications.
 
 ## 📋 Project Overview
 
 This project is a **working web application** that allows users to:
-- ✅ Add and search songs in a catalog
-- ✅ Create and manage playlists
-- ✅ Play, pause, skip songs in a circular manner
-- ✅ Get personalized recommendations
+- Search and browse songs in a CSV-backed catalog
+- ✅ Save named copies of the current queue in browser storage
+- ✅ View saved playlists on Home and in Library
+- ✅ Navigate a simulated playlist queue in a circular manner
+- ✅ Get random, distinct recommendations from the loaded catalog
 - ✅ Visualize DSA operations in real-time
+- Generate a seed-based or mood-based playlist
 
 ## 🎯 DSA Algorithms Implemented
 
@@ -86,7 +88,7 @@ No timing benchmark is included by default. Any optional timing comparison shoul
 
 **How It Works:**
 - After the CSV catalog loads, `app.js` builds a `SongGraph` from the B-Tree's unique in-order song traversal. The existing loader, retrieval, playlist, playback, and UI search behavior are unchanged.
-- Songs with finite numeric `danceability`, `energy`, `acousticness`, `valence`, and `tempo` values become graph nodes. Songs without these values (including the seven sample songs) are recorded in `skippedSongs`.
+- CSV songs with finite numeric `danceability`, `energy`, `acousticness`, `valence`, and `tempo` values become graph nodes. Songs without these values are recorded in `skippedSongs`.
 - Each feature is min-max normalized across valid songs; constant-valued features normalize to zero. Pairwise Euclidean distance across the five normalized features becomes a similarity weight: `1 - distance / sqrt(5)`.
 - Each node stores up to 10 outgoing edges by default. Edges are directed: a song may choose another song without being chosen in return. Neighbors are ordered by descending similarity, then ascending `track_id`.
 - `bfs(trackId, { limit })` and `dfs(trackId, { limit })` iteratively traverse reachable outgoing edges and return track IDs. Unknown starts return an empty array; `getNeighbors()` also returns an empty array for unknown IDs, while `getSong()` returns `null`.
@@ -104,6 +106,35 @@ console.log(graph.bfs('some-track-id', { limit: 20 }));
 - Traversals take O(V + E) time and O(V) auxiliary space.
 - The existing CSV loader converts missing or malformed numeric values to `0`. Per the chosen behavior, graph validation treats those resulting zeros as valid values; it cannot distinguish them from true zero-valued source data without changing the loader.
 - Run graph tests with `node graph.test.js`; run the existing B-Tree, CSV, and binary-search tests with `node btree.test.js`.
+
+---
+
+### Smart Playlist Generator 🎼
+**Purpose:** Generate a 20-song playlist from a seed track or an audio-feature mood profile.
+
+**Logic and API:**
+- `PlaylistGenerator` is implemented in `playlistGenerator.js`, receives the existing B-Tree catalog and SongGraph, and does not load CSV data itself.
+- `generateFromSeed(trackId, options)` puts the valid seed first, collects direct graph neighbors and then expands through outgoing neighbors-of-neighbors up to `expansionDepth` (default 2). Similarity is re-calculated against the seed using `DSA.computeSimilarity`; candidates are ranked by similarity then `track_id`. It takes up to 19 and shuffles only those similar songs with Fisher-Yates.
+- The local expansion is an approximation: an expanded song may not be among the seed's globally closest songs, and the bounded pool may miss better candidates. A full-catalog scan would be required for an exact global top-19.
+- `generateFromMood(moodName, options)` filters graph songs using all rules in a mood profile, ranks matches by average normalized margin beyond the rule thresholds (then `track_id`), keeps the best 20, and shuffles them.
+- `getMatchingSongs(moodName)` returns every valid match without shuffling; `matchesMood(song, moodName)` checks the profile. Mood keys are exported in `MOOD_NAMES`; matching accepts keys or display names case-insensitively.
+- Both modes return `{ type, seed, mood, songs, requested, message }`. An optional `random` function enables repeatable shuffle tests. The generator is exposed as `window.playlistGenerator` after the CSV catalog and graph finish loading.
+- The Generate page uses a multi-step wizard: name the playlist, choose Pick a Song or Pick a Mood, select a catalog seed or exported mood, then review the returned songs in their generated order.
+- The wizard calls the existing `generateFromSeed(trackId)` or `generateFromMood(moodName)` method once per run. A UI-only 2.5-second loading screen shows progress messages without delaying or changing generator or DSA logic.
+- Results stay temporary and do not appear on Home or in Library until **Save to Library** is chosen. Saving writes a copied song snapshot to `genmixSavedPlaylists` in the existing `{ id, name, createdAt, songs }` format. **Delete Playlist** discards only the current unsaved result.
+- Leaving Generate resets the wizard. Duplicate playlist names are allowed, but the same generated result can only be saved once.
+
+**Mood thresholds:** Rules use empirical quartiles from the first 5,000 CSV songs after the graph's min-max normalization. High thresholds are normalized P75; low thresholds are normalized P25: valence 0.677638, danceability 0.681725, energy 0.822211 (high) / 0.312949 (low), tempo 0.635812, acousticness 0.791164 (high). A song can match multiple profiles.
+
+| Mood | Rules | Matches in first 5,000 CSV songs |
+|------|-------|---------------------------------:|
+| Happy / Upbeat | valence ≥ 0.677638 and danceability ≥ 0.681725 | 643 |
+| Energetic | energy ≥ 0.822211 and normalized tempo ≥ 0.635812 | 413 |
+| Chill | energy ≤ 0.312949 and acousticness ≥ 0.791164 | 1,012 |
+| Melancholic | valence ≤ 0.217085 and energy ≤ 0.312949 | 752 |
+| Acoustic | acousticness ≥ 0.791164 | 1,255 |
+
+Run generator, UI helper, and wizard helper tests with `node playlistGenerator.test.js`, `node playlistUI.test.js`, and `node playlistWizard.test.js`; app startup and generator integration checks use `node app.test.js`.
 
 ---
 
@@ -135,7 +166,7 @@ console.log(graph.bfs('some-track-id', { limit: 20 }));
 ---
 
 ### 3. **Priority Queue (Max Heap)** ⭐
-**Purpose:** Generate top-rated song recommendations
+**Purpose:** Demonstrate priority-based song retrieval from a max heap
 
 **Operations Implemented:**
 - `insert()` - Add songs with priority based on rating
@@ -146,8 +177,9 @@ console.log(graph.bfs('some-track-id', { limit: 20 }));
 
 **Use Case:**
 - Songs are prioritized by their rating (1-10 scale)
-- Recommendations always show highest-rated songs first
-- Efficient sorting and prioritization
+- `getTopRecommendations(n)` returns a copy of the highest-rated songs
+- Home recommendations are sampled randomly from the catalog, independently of this heap
+- Efficient prioritization
 
 **Complexity:**
 - Insert: O(log n)
@@ -158,14 +190,14 @@ console.log(graph.bfs('some-track-id', { limit: 20 }));
 ---
 
 ### 4. **Heap Sort** 🔀
-**Purpose:** Shuffle playlist by rating
+**Purpose:** Sort songs by rating
 
 **Operations:**
 - `heapSort()` - Sort songs by rating using heap
 - Builds max heap and extracts elements in sorted order
 
 **Use Case:**
-- Shuffle feature organizes songs from highest to lowest rating
+- Demonstrates sorting songs from highest to lowest rating
 - Demonstrates in-place sorting algorithm
 
 **Complexity:**
@@ -201,50 +233,50 @@ console.log(graph.bfs('some-track-id', { limit: 20 }));
    - The application will automatically open at `http://localhost:3000`
    - Or manually navigate to the provided URL
 
-   Run the standalone B-Tree and CSV tests with:
+   Run all standalone suites with:
    ```bash
-   node btree.test.js
+   node btree.test.js && node graph.test.js && node playlistGenerator.test.js && node playlistUI.test.js && node playlistWizard.test.js && node app.test.js
    ```
 
 ### Usage
 
-#### Adding Songs
-1. Fill in the song details:
-   - Song Title
-   - Artist Name
-   - Duration (in seconds)
-   - Rating (1-10 scale)
-2. Click "Add Song"
-3. The song is automatically added to:
-   - Song catalog (B-Tree)
-   - Current playlist (Circular Queue)
-   - Recommendations (Max Heap)
+#### Adding Songs to the Playlist
+1. Search the existing catalog by title
+2. Click a matching result to add it to the current playlist
+
+#### Saving and Viewing Playlists
+1. Add one or more songs to the queue from Search
+2. On Home, enter a playlist name and choose **Save playlist**
+3. Saved playlist snapshots are stored under `genmixSavedPlaylists` in this browser's localStorage
+4. Home and Library display saved playlists and their song counts; generated results remain separate and unsaved
+
+#### Generating Playlists
+1. Open **Generate** from the navigation menu
+2. Choose **Create Playlist**, enter a name, then select **Pick a Song** or **Pick a Mood**
+3. Select a catalog seed or one of the exported moods and generate the playlist
+4. Choose **Save to Library** to keep it, or **Delete Playlist** to discard it without saving
 
 #### Searching Songs
 1. Type in the search box
 2. Matching song titles from the B-Tree catalog will appear
 3. Click any result to add it to the playlist
 
-#### Managing Playlist
-1. **Shuffle**: Click "Shuffle" to sort playlist by rating using heap sort
-2. **Clear**: Remove all songs from playlist
-3. View visualizations in the algorithm panel
-
-#### Playing Songs
-1. Click ▶️ to start/pause playback
-2. Click ⏭️ to play next song (circular)
-3. Click ⏮️ to play previous song (circular)
+#### Using the Simulated Queue
+1. Use the existing play/pause control to start or pause the queue simulation
+2. Use Next or Previous to move through the circular queue
+3. No real audio is played
+4. Save the current queue from Home to keep a named snapshot in this browser
 
 #### Recommendations
-- Top 5 highest-rated songs automatically displayed
-- Updates when new songs are added
+- Home samples up to 12 distinct songs from the cached CSV catalog index
+- Refresh or revisit Home for a new sample; recommendations do not alter the catalog or queue
 
 ---
 
 ## 📊 Algorithm Visualization
 
 The application includes **real-time visualization** of DSA operations:
-- See when songs are added to different structures
+- See when songs are queued and when DSA operations run
 - Track search operations in the B-Tree catalog
 - Monitor circular queue navigation
 - Watch heap operations during shuffle
@@ -256,13 +288,21 @@ Visualizations appear in the center panel's "Algorithm Visualization" section.
 ## 🏗️ Project Structure
 
 ```
-Music Playlist Organizer/
+GenMix/
 ├── index.html          # Main HTML structure
 ├── styles.css          # Modern UI styling
 ├── dsa.js             # DSA implementations (B-Tree, Queue, Heap)
 ├── app.js             # Application logic and UI interactions
+├── playlistGenerator.js # Seed- and mood-based playlist logic
+├── playlistUI.js       # Pure UI search and display helpers
+├── playlistWizard.js   # Pure wizard state and saved-record helpers
 ├── songs_cleaned.csv  # Song catalog dataset (first 5,000 rows loaded)
 ├── btree.test.js      # Standalone Node.js B-Tree tests
+├── graph.test.js      # Standalone SongGraph tests
+├── playlistGenerator.test.js # Generator logic tests
+├── playlistUI.test.js # UI helper tests
+├── playlistWizard.test.js # Wizard state and save-shape tests
+├── app.test.js        # CSV startup and generator integration tests
 ├── package.json       # Project configuration
 └── README.md          # This file
 ```
@@ -294,18 +334,17 @@ This project demonstrates:
 ## 🎨 Features
 
 ### User Interface
-- 🎨 **Modern Premium Design** with gradient colors
-- 📱 **Mobile-Responsive** layout
-- 🌙 **Dark Theme** optimized for extended use
-- ✨ **Smooth Animations** and transitions
-- 📊 **Real-time Statistics** display
+- Responsive blue theme with a sliding navigation menu
+- Keyboard-accessible navigation with focus states
+- Subtle blue gradients and restrained glass surfaces
+- Seed- and mood-based playlist generation
 
 ### Functionality
-- ✅ Full CRUD operations on songs
+- CSV-backed catalog search and browsing
+- Saved-playlist collections on Home and Library
 - 🔍 Track ID lookup with B-Tree and title search compatibility scan
-- 🔄 Seamless circular playback
-- ⭐ Smart recommendations
-- 📈 Live statistics tracking
+- 🔄 Circular queue navigation simulation (no audio playback)
+- ⭐ Random catalog recommendations
 - 🎬 Visual algorithm execution
 
 ---
@@ -320,14 +359,9 @@ This project demonstrates:
 | **Circular Queue** | Playlist | O(1) | - | O(1) | O(n) |
 | **Max Heap** | Recommendations | O(log n) | - | O(log n) | O(n) |
 
-### Sample Songs Included
-- Bohemian Rhapsody - Queen (Rating: 10)
-- Hotel California - Eagles (Rating: 9)
-- Stairway to Heaven - Led Zeppelin (Rating: 10)
-- Imagine - John Lennon (Rating: 8)
-- Billie Jean - Michael Jackson (Rating: 9)
-- Like a Rolling Stone - Bob Dylan (Rating: 8)
-- Smells Like Teen Spirit - Nirvana (Rating: 9)
+### Catalog Data
+- The startup library is loaded from `songs_cleaned.csv` in the project root, up to the first 5,000 data rows.
+- If the CSV cannot be loaded or yields no usable songs, the library displays an empty-state message; no demo songs are inserted.
 
 ---
 
@@ -335,7 +369,7 @@ This project demonstrates:
 
 Potential additions for extended learning:
 - [ ] B-Tree deletion as a separate extension
-- [ ] Graph algorithms for music recommendation engine
+- [ ] Connect playlist generator to future UI controls
 - [ ] Hash table for O(1) artist lookup
 - [ ] Trie for autocomplete search
 - [ ] Merge sort comparison

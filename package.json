@@ -1,7 +1,7 @@
 {
   "name": "music-playlist-organizer",
   "version": "1.0.0",
-  "description": "A Music Playlist Organizer demonstrating DSA algorithms - B-Tree, Circular Queue, and Priority Queue",
+  "description": "GenMix demonstrates DSA algorithms - B-Tree, Circular Queue, and Priority Queue",
   "main": "index.html",
   "scripts": {
     "dev": "npx http-server . -p 3000 -o",

@@ -1,6 +1,6 @@
 # 🚀 Quick Start Guide
 
-Get your Music Playlist Organizer running in 30 seconds!
+Get GenMix running in 30 seconds!
 
 ## Step 1: Install Dependencies
 ```bash
@@ -21,38 +21,41 @@ npm start
 ## Step 3: Open in Browser
 The application will automatically open at **http://localhost:3000**
 
-The catalog loads up to the first 5,000 data rows from `songs_cleaned.csv` in the project root. Run the standalone data-structure tests with:
+The startup catalog loads up to the first 5,000 data rows from `songs_cleaned.csv` in the project root. If the file cannot be loaded or contains no usable songs, the library stays empty and displays a message; no demo songs are inserted. Run the standalone test suites with:
 
 ```bash
-node btree.test.js
+node btree.test.js && node graph.test.js && node playlistGenerator.test.js && node playlistUI.test.js && node playlistWizard.test.js && node app.test.js
 ```
 
 ---
 
 ## 🎯 Try These Features
 
-### 1. Add a Song
-- Enter song details in the left panel
-- Click "Add Song"
-- Watch the visualization update!
+### 1. Search the Catalog
+- Type a song title in the search box
+- Click a matching result to add it to the playlist queue
+- Home shows a fresh sample of 12 real catalog songs; use Refresh for another sample
+- Library lists saved playlists, not catalog songs
 
-### 2. Search Songs
-- Type in the search box
-- See the B-Tree catalog's title-search compatibility scan
-- Click results to add to playlist
+### 2. Generate a Playlist
+- Open Generate from the hamburger menu
+- Choose **Create Playlist** and enter a name
+- Pick a song by title/artist or select one of the exported moods
+- Review the result, then save it to Library or discard it
 
-### 3. Play Music
-- Click ▶️ to play
-- Use ⏭️ / ⏮️ to navigate circularly
-- See circular queue operations
+### Save a Playlist
+- Add songs to the queue from Search
+- On Home, enter a name under "Save current queue" and choose "Save playlist"
+- Saved playlists are stored in this browser and appear on Home and in Library
 
-### 4. Shuffle Playlist
-- Click "Shuffle" button
-- Watch heap sort organize songs by rating
+### 3. Navigate the Simulated Queue
+- Use the queue controls to start or pause the playback simulation
+- Use Next and Previous to navigate circularly
+- No real audio is played
 
-### 5. View Recommendations
-- Check the right panel
-- See top-rated songs from Max Heap
+### 4. View Recommendations
+- Browse the real-catalog sample in Home
+- Refresh recommendations without changing the queue or catalog
 
 ---
 
@@ -62,8 +65,10 @@ node btree.test.js
 |-----------|--------------|-----------------|
 | **B-Tree** | Indexes songs by track ID | Load the catalog, then search |
 | **Circular Queue** | Loops through playlist | Use Next/Previous buttons |
-| **Max Heap** | Prioritizes by rating | Recommendations panel |
-| **Heap Sort** | Sorts by rating | Shuffle button |
+| **Max Heap** | Prioritizes songs by rating | Max Heap tests |
+| **Heap Sort** | Sorts by rating | DSA implementation |
+| **Song Graph** | Connects songs by audio-feature similarity | Graph tests |
+| **Playlist Generator** | Builds seed-based or mood-filtered song arrays | Generator tests |
 
 ---
 
@@ -94,21 +99,19 @@ node btree.test.js
 ## 💡 Tips
 
 - **Check the visualization panel** to see algorithms in action
-- **Watch statistics** update in real-time
-- **Try loading the catalog** to see B-Tree height change
+- **Watch the visualizer** report data-structure operations
+- **Search the catalog** to inspect B-Tree title matching
 - **Test circular navigation** by playing through the playlist
-- **Shuffle multiple times** to see consistent sorting
+- **Run the focused tests** to verify the data-structure implementations
 
 ---
 
 ## 🎨 Features to Explore
 
-- 📱 Responsive design (try resizing your browser!)
-- 🎨 Modern UI with animations
-- ⚡ Fast search and operations
-- 📊 Real-time statistics
-- 🔄 Seamless circular playback
-- ⭐ Smart recommendations
+- Responsive blue design and a sliding accessible menu
+- Fast search and data-structure operations
+- Circular queue navigation simulation
+- Smart recommendations and playlist generation
 
 ---
 
