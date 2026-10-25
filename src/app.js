@@ -333,7 +333,8 @@ function setupYouTubeExportUI() {
         google: window.google
     });
     const cache = new window.YouTubeMatchCache(window.localStorage);
-    const api = new window.YouTubeApiClient({ auth: youtubeAuth, fetch: window.fetch || fetch });
+    const browserFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
+    const api = new window.YouTubeApiClient({ auth: youtubeAuth, fetch: browserFetch });
     const exporter = new window.YouTubeExporter({ api, cache });
     youtubeExportUI = new window.YouTubeExportUI({
         document,

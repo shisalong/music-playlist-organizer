@@ -191,6 +191,41 @@ function createApi(overrides = {}) {
         }
     });
 
+    await runTest('API client retries a failed GET on the alternate Google hostname', async () => {
+        const urls = [];
+        const api = new YouTubeApiClient({
+            auth: { async getAccessToken() { return 'token'; } },
+            fetch: async (url) => {
+                urls.push(url);
+                if (urls.length === 1) throw new TypeError('Failed to fetch');
+                return { ok: true, status: 200, async json() { return { items: [] }; } };
+            }
+        });
+        await api.searchVideos('query');
+        assert(urls.length === 2, 'A failed search GET should retry once');
+        assert(urls[0].startsWith('https://www.googleapis.com/'), 'The documented endpoint should be tried first');
+        assert(urls[1].startsWith('https://youtube.googleapis.com/'), 'The alternate Google endpoint should be tried second');
+    });
+
+    await runTest('API client does not retry a failed POST that could duplicate data', async () => {
+        let requests = 0;
+        const api = new YouTubeApiClient({
+            auth: { async getAccessToken() { return 'token'; } },
+            fetch: async () => {
+                requests++;
+                throw new TypeError('Failed to fetch');
+            }
+        });
+        try {
+            await api.createPlaylist('Name', 'private');
+            throw new Error('Expected network failure');
+        } catch (error) {
+            assert(error.code === 'network_error', 'Network failure should retain its code');
+            assert(error.message.includes('ad/tracker blocking'), 'Network failure should be actionable');
+            assert(requests === 1, 'A failed create request must not be retried');
+        }
+    });
+
     console.log(`\nTest summary: ${passed} passed, ${failed} failed`);
     if (failed > 0) process.exitCode = 1;
 })();

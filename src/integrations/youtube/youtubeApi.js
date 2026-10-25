@@ -7,6 +7,7 @@
     global.YouTubeApiError = exported.YouTubeApiError;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
     const API_BASE_URL = 'https://www.googleapis.com/youtube/v3';
+    const API_FALLBACK_BASE_URL = 'https://youtube.googleapis.com/youtube/v3';
 
     class YouTubeApiError extends Error {
         constructor(code, message, status, details) {
@@ -30,7 +31,10 @@
         // Wrap fetch and authorization so retry behavior stays outside the exporter.
         constructor(options = {}) {
             this.auth = options.auth;
-            this.fetch = options.fetch || globalThis.fetch;
+            const fetchImplementation = options.fetch || globalThis.fetch;
+            this.fetch = typeof fetchImplementation === 'function'
+                ? fetchImplementation.bind(options.fetch ? null : globalThis)
+                : null;
             this.sleep = options.sleep || ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
             this.maxTransientRetries = options.maxTransientRetries === undefined ? 2 : options.maxTransientRetries;
         }
@@ -41,19 +45,37 @@
             const method = options.method || 'GET';
             let transientAttempt = 0;
             while (true) {
-                let response;
-                try {
-                    response = await this.fetch(`${API_BASE_URL}${path}`, {
-                        method,
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                            ...(options.body ? { 'Content-Type': 'application/json' } : {})
-                        },
-                        body: options.body ? JSON.stringify(options.body) : undefined,
-                        signal: options.signal
-                    });
-                } catch (error) {
-                    throw new YouTubeApiError('network_error', 'Could not reach YouTube. Check your connection and try again.', 0, error);
+                let response = null;
+                let networkError = null;
+                const baseUrls = method === 'GET'
+                    ? [API_BASE_URL, API_FALLBACK_BASE_URL]
+                    : [API_BASE_URL];
+                for (const baseUrl of baseUrls) {
+                    try {
+                        response = await this.fetch(`${baseUrl}${path}`, {
+                            method,
+                            headers: {
+                                Authorization: `Bearer ${token}`,
+                                ...(options.body ? { 'Content-Type': 'application/json' } : {})
+                            },
+                            body: options.body ? JSON.stringify(options.body) : undefined,
+                            signal: options.signal
+                        });
+                        break;
+                    } catch (error) {
+                        networkError = error;
+                    }
+                }
+                if (!response) {
+                    const detail = networkError && networkError.message
+                        ? ` Browser detail: ${networkError.message}`
+                        : '';
+                    throw new YouTubeApiError(
+                        'network_error',
+                        `The browser blocked or could not reach the YouTube Data API. Check your connection, disable ad/tracker blocking for GenMix, and confirm the YouTube Data API v3 is enabled.${detail}`,
+                        0,
+                        networkError
+                    );
                 }
 
                 let payload = null;
@@ -129,5 +151,5 @@
         }
     }
 
-    return { API_BASE_URL, YouTubeApiError, getErrorReason, YouTubeApiClient };
+    return { API_BASE_URL, API_FALLBACK_BASE_URL, YouTubeApiError, getErrorReason, YouTubeApiClient };
 });
