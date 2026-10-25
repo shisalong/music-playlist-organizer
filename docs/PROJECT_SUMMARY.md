@@ -20,7 +20,7 @@
 5. **Song Similarity Graph** - Directed, weighted top-k audio-feature neighbors with BFS/DFS
 6. **Smart Playlist Generator** - Seed expansion and data-driven mood filtering
 
-The startup catalog is loaded from `songs_cleaned.csv` (up to 5,000 data rows). No hardcoded demo songs are inserted; an unavailable or empty CSV leaves the library empty and displays a message.
+The startup catalog is loaded from `data/songs_deduped.csv` (4,428 unique songs). No hardcoded demo songs are inserted; an unavailable or empty CSV leaves the library empty and displays a message.
 
 ### Practical Application ✓
 - Demonstrates algorithms solving real problems
@@ -227,25 +227,32 @@ Open browser at `http://localhost:3010`
 
 ```
 GenMix/
-├── index.html          # Main application UI
-├── styles.css          # Styling and design
-├── dsa.js             # DSA implementations
-├── app.js             # Application logic
-├── playlistGenerator.js # Seed and mood playlist generation
-├── playlistUI.js       # Playlist UI search and display helpers
-├── playlistWizard.js   # Pure wizard transitions and save-shape helpers
-├── songs_cleaned.csv  # Catalog dataset (first 5,000 rows loaded)
-├── btree.test.js      # Standalone B-Tree and CSV tests
-├── graph.test.js      # Standalone SongGraph tests
-├── playlistGenerator.test.js # Playlist generator tests
-├── playlistUI.test.js # Playlist UI helper tests
-├── playlistWizard.test.js # Playlist wizard logic tests
-├── app.test.js        # CSV startup and generator integration tests
-├── package.json       # Configuration
-├── README.md          # Full documentation
-├── QUICK_START.md     # Quick reference
-├── PROJECT_SUMMARY.md # This file
-└── .gitignore         # Git configuration
+├── index.html                  # Main HTML structure (served from the project root)
+├── css/
+│   └── styles.css              # UI styling
+├── src/
+│   ├── app.js                  # Application logic and UI interactions
+│   ├── core/
+│   │   └── dsa.js              # DSA implementations (B-Tree, binary search, Circular Queue, Max Heap, SongGraph)
+│   ├── playlist/
+│   │   ├── playlistGenerator.js  # Seed- and mood-based playlist logic
+│   │   ├── playlistWizard.js     # Pure wizard state and saved-record helpers
+│   │   ├── playlistEditor.js     # Pure saved-playlist edit helpers (add, remove, rename, move, delete)
+│   │   └── playlistUI.js         # Pure UI search and display helpers
+│   └── integrations/
+│       └── youtube/            # YouTube auth, API client, matcher, cache, exporter, and export UI
+├── data/
+│   ├── songs_deduped.csv       # Song catalog loaded by the app (4,428 unique songs)
+│   └── songs_cleaned.csv       # Original full dataset (kept for reference)
+├── tests/                      # Standalone Node.js test suites (run with npm test)
+│   └── youtube/                # YouTube integration tests
+├── docs/                       # Quick start, project summary, YouTube setup, and project report
+├── scripts/
+│   ├── generate-config.js      # Builds config.local.js from .env
+│   └── convert_to_word.py      # Converts docs/PROJECT_REPORT.md to Word
+├── config.local.js             # Generated, git-ignored browser configuration
+├── package.json                # Project configuration and npm scripts
+└── README.md                   # Full documentation
 ```
 
 ---

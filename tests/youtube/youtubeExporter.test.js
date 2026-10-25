@@ -1,6 +1,6 @@
-const { YouTubeExporter, estimateQuota } = require('./youtubeExporter.js');
-const { YouTubeMatchCache } = require('./youtubeCache.js');
-const { YouTubeApiClient } = require('./youtubeApi.js');
+const { YouTubeExporter, estimateQuota } = require('../../src/integrations/youtube/youtubeExporter.js');
+const { YouTubeMatchCache } = require('../../src/integrations/youtube/youtubeCache.js');
+const { YouTubeApiClient } = require('../../src/integrations/youtube/youtubeApi.js');
 
 let passed = 0;
 let failed = 0;

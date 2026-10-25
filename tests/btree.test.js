@@ -10,7 +10,7 @@ const {
     isSortedByTrackId,
     buildSortedSongArray,
     SortedSongIndex
-} = require('./dsa.js');
+} = require('../src/core/dsa.js');
 
 let passed = 0;
 let failed = 0;
@@ -190,7 +190,7 @@ runTest('CSV loader reports duplicates, skips empty IDs, and defaults invalid nu
     assert(tree.validate(), 'Loader output should satisfy B-Tree invariants');
 });
 
-const csvPath = path.join(__dirname, 'songs_deduped.csv');
+const csvPath = path.join(__dirname, '..', 'data', 'songs_deduped.csv');
 const DEDUPED_CSV_SONG_COUNT = 4428;
 if (fs.existsSync(csvPath)) {
     runTest('real CSV loads up to the configured limit and validates', () => {
@@ -328,7 +328,7 @@ runTest('binary search matches B-Tree for 5,000 shuffled synthetic songs', () =>
     }
 });
 
-const binarySearchCsvPath = path.join(__dirname, 'songs_deduped.csv');
+const binarySearchCsvPath = path.join(__dirname, '..', 'data', 'songs_deduped.csv');
 if (fs.existsSync(binarySearchCsvPath)) {
     runTest('binary search matches B-Tree for every real CSV row', () => {
         const csvText = fs.readFileSync(binarySearchCsvPath, 'utf8');

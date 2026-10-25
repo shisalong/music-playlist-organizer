@@ -1,11 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const DSA = require('./dsa.js');
-const { PlaylistGenerator, MOOD_NAMES, MOOD_PROFILES } = require('./playlistGenerator.js');
-const PlaylistUI = require('./playlistUI.js');
-const PlaylistWizard = require('./playlistWizard.js');
-const PlaylistEditor = require('./playlistEditor.js');
+const DSA = require('../src/core/dsa.js');
+const { PlaylistGenerator, MOOD_NAMES, MOOD_PROFILES } = require('../src/playlist/playlistGenerator.js');
+const PlaylistUI = require('../src/playlist/playlistUI.js');
+const PlaylistWizard = require('../src/playlist/playlistWizard.js');
+const PlaylistEditor = require('../src/playlist/playlistEditor.js');
 
 let passed = 0;
 let failed = 0;
@@ -201,7 +201,7 @@ function createApp(fetchImplementation, localStorage = createMemoryStorage()) {
         Math
     };
     vm.runInNewContext(
-        fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8'),
+        fs.readFileSync(path.join(__dirname, '..', 'src', 'app.js'), 'utf8'),
         context,
         { filename: 'app.js' }
     );
@@ -332,7 +332,7 @@ async function main() {
     });
 
     await runTest('real CSV startup contains only source records and preserves legitimate title collisions', async () => {
-        const csvText = fs.readFileSync(path.join(__dirname, 'songs_deduped.csv'), 'utf8');
+        const csvText = fs.readFileSync(path.join(__dirname, '..', 'data', 'songs_deduped.csv'), 'utf8');
         const app = createApp(async () => csvResponse(csvText));
         await app.startup();
         const sourceTree = new DSA.BTree();
@@ -468,7 +468,7 @@ async function main() {
     });
 
     await runTest('saved queue playlists render in Home and Library and persist across app reloads', async () => {
-        const csvText = fs.readFileSync(path.join(__dirname, 'songs_deduped.csv'), 'utf8');
+        const csvText = fs.readFileSync(path.join(__dirname, '..', 'data', 'songs_deduped.csv'), 'utf8');
         const storage = createMemoryStorage();
         const app = createApp(async () => csvResponse(csvText), storage);
         await app.startup();
@@ -514,7 +514,7 @@ async function main() {
     });
 
     await runTest('generated playlists save once, refresh Home and Library, and persist', async () => {
-        const csvText = fs.readFileSync(path.join(__dirname, 'songs_deduped.csv'), 'utf8');
+        const csvText = fs.readFileSync(path.join(__dirname, '..', 'data', 'songs_deduped.csv'), 'utf8');
         const storage = createMemoryStorage();
         const existingPlaylist = {
             id: 'preexisting',
@@ -586,7 +586,7 @@ async function main() {
     });
 
     await runTest('saved playlists with songs missing from the dataset still open and edit', async () => {
-        const csvText = fs.readFileSync(path.join(__dirname, 'songs_deduped.csv'), 'utf8');
+        const csvText = fs.readFileSync(path.join(__dirname, '..', 'data', 'songs_deduped.csv'), 'utf8');
         const sourceTree = new DSA.BTree();
         DSA.loadSongsFromCSV(csvText, sourceTree);
         const realSong = sourceTree.inorderTraversal()[0];
@@ -622,7 +622,7 @@ async function main() {
     });
 
     await runTest('Library playlists can be deleted from a card or the detail view and stay deleted', async () => {
-        const csvText = fs.readFileSync(path.join(__dirname, 'songs_deduped.csv'), 'utf8');
+        const csvText = fs.readFileSync(path.join(__dirname, '..', 'data', 'songs_deduped.csv'), 'utf8');
         const sourceTree = new DSA.BTree();
         DSA.loadSongsFromCSV(csvText, sourceTree);
         const [songA, songB] = sourceTree.inorderTraversal();
@@ -690,7 +690,7 @@ async function main() {
     });
 
     await runTest('Delete discards results and empty or failed generation is recoverable', async () => {
-        const csvText = fs.readFileSync(path.join(__dirname, 'songs_deduped.csv'), 'utf8');
+        const csvText = fs.readFileSync(path.join(__dirname, '..', 'data', 'songs_deduped.csv'), 'utf8');
         const storage = createMemoryStorage();
         const app = createApp(async () => csvResponse(csvText), storage);
         await app.startup();

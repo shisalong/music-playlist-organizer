@@ -190,6 +190,8 @@ def parse_markdown_to_docx(md_file, docx_file):
     print(f"📄 Word document saved as: {docx_file}")
 
 if __name__ == '__main__':
-    md_file = 'PROJECT_REPORT.md'
-    docx_file = 'PROJECT_REPORT.docx'
+    import os
+    docs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'docs')
+    md_file = os.path.join(docs_dir, 'PROJECT_REPORT.md')
+    docx_file = os.path.join(docs_dir, 'PROJECT_REPORT.docx')
     parse_markdown_to_docx(md_file, docx_file)

@@ -1,7 +1,7 @@
 // Keep playlist recommendations separate from the reusable data-structure implementations.
 (function (global) {
     const dsaApi = global.DSA || (
-        typeof require === 'function' ? require('./dsa.js') : null
+        typeof require === 'function' ? require('../core/dsa.js') : null
     );
     const PLAYLIST_SIZE = 20;
 

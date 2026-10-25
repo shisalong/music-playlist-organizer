@@ -3,7 +3,7 @@ const {
     sampleSongs,
     formatAudioFeature,
     formatMoodName
-} = require('./playlistUI.js');
+} = require('../src/playlist/playlistUI.js');
 
 let passed = 0;
 let failed = 0;

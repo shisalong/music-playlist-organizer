@@ -1,4 +1,4 @@
-const Editor = require('./playlistEditor.js');
+const Editor = require('../src/playlist/playlistEditor.js');
 
 let passed = 0;
 let failed = 0;

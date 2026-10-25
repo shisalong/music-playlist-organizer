@@ -21,10 +21,10 @@ npm start
 ## Step 3: Open in Browser
 The application will automatically open at **http://localhost:3010**
 
-The startup catalog loads up to the first 5,000 data rows from `songs_cleaned.csv` in the project root. If the file cannot be loaded or contains no usable songs, the library stays empty and displays a message; no demo songs are inserted. Run the standalone test suites with:
+The startup catalog loads the 4,428 unique songs in `data/songs_deduped.csv`. If the file cannot be loaded or contains no usable songs, the library stays empty and displays a message; no demo songs are inserted. Run the standalone test suites with:
 
 ```bash
-node btree.test.js && node graph.test.js && node playlistGenerator.test.js && node playlistUI.test.js && node playlistWizard.test.js && node app.test.js
+npm test
 ```
 
 ---

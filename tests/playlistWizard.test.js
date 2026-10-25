@@ -1,6 +1,6 @@
-const Wizard = require('./playlistWizard.js');
-const DSA = require('./dsa.js');
-const { PlaylistGenerator, MOOD_NAMES } = require('./playlistGenerator.js');
+const Wizard = require('../src/playlist/playlistWizard.js');
+const DSA = require('../src/core/dsa.js');
+const { PlaylistGenerator, MOOD_NAMES } = require('../src/playlist/playlistGenerator.js');
 
 let passed = 0;
 let failed = 0;

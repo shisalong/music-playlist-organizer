@@ -10,7 +10,7 @@ const {
     computeSimilarity,
     SongGraph,
     loadSongsFromCSV
-} = require('./dsa.js');
+} = require('../src/core/dsa.js');
 
 let passed = 0;
 let failed = 0;
@@ -303,7 +303,7 @@ runTest('stores at most k edges per node on a deterministic 5,000-song set', () 
 });
 
 runTest('builds a sparse graph from the real CSV dataset', () => {
-    const csvPath = path.join(__dirname, 'songs_deduped.csv');
+    const csvPath = path.join(__dirname, '..', 'data', 'songs_deduped.csv');
     const csvText = fs.readFileSync(csvPath, 'utf8');
     const tree = new BTree();
     const loadStats = loadSongsFromCSV(csvText, tree);

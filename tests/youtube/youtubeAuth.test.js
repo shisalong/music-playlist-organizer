@@ -1,4 +1,4 @@
-const { YouTubeAuth } = require('./youtubeAuth.js');
+const { YouTubeAuth } = require('../../src/integrations/youtube/youtubeAuth.js');
 
 let passed = 0;
 let failed = 0;

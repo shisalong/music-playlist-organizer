@@ -8,14 +8,14 @@ const {
     hasValidFeatures,
     computeSimilarity,
     loadSongsFromCSV
-} = require('./dsa.js');
+} = require('../src/core/dsa.js');
 const {
     PLAYLIST_SIZE,
     MOOD_NAMES,
     MOOD_PROFILES,
     shuffleSongs,
     PlaylistGenerator
-} = require('./playlistGenerator.js');
+} = require('../src/playlist/playlistGenerator.js');
 
 let passed = 0;
 let failed = 0;
@@ -446,7 +446,7 @@ runTest('5,000-song synthetic mood playlists remain bounded and correctly filter
     }
 });
 
-const csvPath = path.join(__dirname, 'songs_deduped.csv');
+const csvPath = path.join(__dirname, '..', 'data', 'songs_deduped.csv');
 const csvText = fs.readFileSync(csvPath, 'utf8');
 const csvCatalog = new BTree();
 const csvLoadStats = loadSongsFromCSV(csvText, csvCatalog);

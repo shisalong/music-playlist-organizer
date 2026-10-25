@@ -1,4 +1,4 @@
-const Matcher = require('./youtubeMatcher.js');
+const Matcher = require('../../src/integrations/youtube/youtubeMatcher.js');
 
 let passed = 0;
 let failed = 0;

@@ -29,7 +29,7 @@ This project is a **working web application** that allows users to:
 - Catalog songs are stored by `track_id`; the B-Tree remains balanced as it grows
 - The existing partial-title search is retained as a compatibility scan
 - Tree traversal is by track ID; the UI sorts displayed library and search results by title
-- The supplied `songs_cleaned.csv` file is loaded from the project root, up to the first 5,000 data rows
+- The catalog is loaded from `data/songs_deduped.csv` (4,428 unique songs; the loader caps input at 5,000 data rows)
 
 **Complexity:**
 - Insert and track ID lookup: O(log n) for fixed minimum degree
@@ -42,9 +42,9 @@ This project is a **working web application** that allows users to:
 **Purpose:** Compare searching a sorted song array with looking up the same song in the B-Tree.
 
 **Where It Lives:**
-- `binarySearchIndexByTrackId()` and `binarySearchByTrackId()` are implemented in `dsa.js`
+- `binarySearchIndexByTrackId()` and `binarySearchByTrackId()` are implemented in `src/core/dsa.js`
 - `SortedSongIndex` builds one verified snapshot from `BTree.inorderTraversal()`
-- `compareRetrievalMethods(trackId)` in `app.js` returns both results for a console demo; the UI search remains B-Tree-based
+- `compareRetrievalMethods(trackId)` in `src/app.js` returns both results for a console demo; the UI search remains B-Tree-based
 
 **How It Works:**
 - Binary search checks the middle track ID and discards the half that cannot contain the requested ID
@@ -76,7 +76,7 @@ console.log(song ? song.title : 'Not found');
 
 Run the B-Tree and binary search tests with:
 ```bash
-node btree.test.js
+node tests/btree.test.js
 ```
 
 No timing benchmark is included by default. Any optional timing comparison should be treated as approximate: results depend on the machine, runtime, and repetition count.
@@ -87,7 +87,7 @@ No timing benchmark is included by default. Any optional timing comparison shoul
 **Purpose:** Find songs with similar audio features using a directed, weighted adjacency-list graph.
 
 **How It Works:**
-- After the CSV catalog loads, `app.js` builds a `SongGraph` from the B-Tree's unique in-order song traversal. The existing loader, retrieval, playlist, playback, and UI search behavior are unchanged.
+- After the CSV catalog loads, `src/app.js` builds a `SongGraph` from the B-Tree's unique in-order song traversal. The existing loader, retrieval, playlist, playback, and UI search behavior are unchanged.
 - CSV songs with finite numeric `danceability`, `energy`, `acousticness`, `valence`, and `tempo` values become graph nodes. Songs without these values are recorded in `skippedSongs`.
 - Each feature is min-max normalized across valid songs; constant-valued features normalize to zero. Pairwise Euclidean distance across the five normalized features becomes a similarity weight: `1 - distance / sqrt(5)`.
 - Each node stores up to 10 outgoing edges by default. Edges are directed: a song may choose another song without being chosen in return. Neighbors are ordered by descending similarity, then ascending `track_id`.
@@ -105,7 +105,7 @@ console.log(graph.bfs('some-track-id', { limit: 20 }));
 - Building the graph currently compares every valid song pair: O(n² × 5) time. Only the best `k` outgoing edges per node are retained, so graph storage is O(nk); this is suitable for the existing 5,000-row CSV load but not the full ~80,000-row dataset.
 - Traversals take O(V + E) time and O(V) auxiliary space.
 - The existing CSV loader converts missing or malformed numeric values to `0`. Per the chosen behavior, graph validation treats those resulting zeros as valid values; it cannot distinguish them from true zero-valued source data without changing the loader.
-- Run graph tests with `node graph.test.js`; run the existing B-Tree, CSV, and binary-search tests with `node btree.test.js`.
+- Run graph tests with `node tests/graph.test.js`; run the existing B-Tree, CSV, and binary-search tests with `node tests/btree.test.js`.
 
 ---
 
@@ -113,7 +113,7 @@ console.log(graph.bfs('some-track-id', { limit: 20 }));
 **Purpose:** Generate a 20-song playlist from a seed track or an audio-feature mood profile.
 
 **Logic and API:**
-- `PlaylistGenerator` is implemented in `playlistGenerator.js`, receives the existing B-Tree catalog and SongGraph, and does not load CSV data itself.
+- `PlaylistGenerator` is implemented in `src/playlist/playlistGenerator.js`, receives the existing B-Tree catalog and SongGraph, and does not load CSV data itself.
 - `generateFromSeed(trackId, options)` puts the valid seed first, collects direct graph neighbors and then expands through outgoing neighbors-of-neighbors up to `expansionDepth` (default 2). Similarity is re-calculated against the seed using `DSA.computeSimilarity`; candidates are ranked by similarity then `track_id`. It takes up to 19 and shuffles only those similar songs with Fisher-Yates.
 - The local expansion is an approximation: an expanded song may not be among the seed's globally closest songs, and the bounded pool may miss better candidates. A full-catalog scan would be required for an exact global top-19.
 - `generateFromMood(moodName, options)` filters graph songs using all rules in a mood profile, ranks matches by average normalized margin beyond the rule thresholds (then `track_id`), keeps the best 20, and shuffles them.
@@ -134,7 +134,7 @@ console.log(graph.bfs('some-track-id', { limit: 20 }));
 | Melancholic | valence ≤ 0.217085 and energy ≤ 0.312949 | 752 |
 | Acoustic | acousticness ≥ 0.791164 | 1,255 |
 
-Run generator, UI helper, and wizard helper tests with `node playlistGenerator.test.js`, `node playlistUI.test.js`, and `node playlistWizard.test.js`; app startup and generator integration checks use `node app.test.js`.
+Run generator, UI helper, and wizard helper tests with `node tests/playlistGenerator.test.js`, `node tests/playlistUI.test.js`, and `node tests/playlistWizard.test.js`; app startup and generator integration checks use `node tests/app.test.js`. `npm test` runs every suite.
 
 ---
 
@@ -297,22 +297,32 @@ Visualizations appear in the center panel's "Algorithm Visualization" section.
 
 ```
 GenMix/
-├── index.html          # Main HTML structure
-├── styles.css          # Modern UI styling
-├── dsa.js             # DSA implementations (B-Tree, Queue, Heap)
-├── app.js             # Application logic and UI interactions
-├── playlistGenerator.js # Seed- and mood-based playlist logic
-├── playlistUI.js       # Pure UI search and display helpers
-├── playlistWizard.js   # Pure wizard state and saved-record helpers
-├── songs_cleaned.csv  # Song catalog dataset (first 5,000 rows loaded)
-├── btree.test.js      # Standalone Node.js B-Tree tests
-├── graph.test.js      # Standalone SongGraph tests
-├── playlistGenerator.test.js # Generator logic tests
-├── playlistUI.test.js # UI helper tests
-├── playlistWizard.test.js # Wizard state and save-shape tests
-├── app.test.js        # CSV startup and generator integration tests
-├── package.json       # Project configuration
-└── README.md          # This file
+├── index.html                  # Main HTML structure (served from the project root)
+├── css/
+│   └── styles.css              # UI styling
+├── src/
+│   ├── app.js                  # Application logic and UI interactions
+│   ├── core/
+│   │   └── dsa.js              # DSA implementations (B-Tree, binary search, Circular Queue, Max Heap, SongGraph)
+│   ├── playlist/
+│   │   ├── playlistGenerator.js  # Seed- and mood-based playlist logic
+│   │   ├── playlistWizard.js     # Pure wizard state and saved-record helpers
+│   │   ├── playlistEditor.js     # Pure saved-playlist edit helpers (add, remove, rename, move, delete)
+│   │   └── playlistUI.js         # Pure UI search and display helpers
+│   └── integrations/
+│       └── youtube/            # YouTube auth, API client, matcher, cache, exporter, and export UI
+├── data/
+│   ├── songs_deduped.csv       # Song catalog loaded by the app (4,428 unique songs)
+│   └── songs_cleaned.csv       # Original full dataset (kept for reference)
+├── tests/                      # Standalone Node.js test suites (run with npm test)
+│   └── youtube/                # YouTube integration tests
+├── docs/                       # Quick start, project summary, YouTube setup, and project report
+├── scripts/
+│   ├── generate-config.js      # Builds config.local.js from .env
+│   └── convert_to_word.py      # Converts docs/PROJECT_REPORT.md to Word
+├── config.local.js             # Generated, git-ignored browser configuration
+├── package.json                # Project configuration and npm scripts
+└── README.md                   # This file
 ```
 
 ---
@@ -368,7 +378,7 @@ This project demonstrates:
 | **Max Heap** | Recommendations | O(log n) | - | O(log n) | O(n) |
 
 ### Catalog Data
-- The startup library is loaded from `songs_cleaned.csv` in the project root, up to the first 5,000 data rows.
+- The startup library is loaded from `data/songs_deduped.csv` (4,428 unique songs).
 - If the CSV cannot be loaded or yields no usable songs, the library displays an empty-state message; no demo songs are inserted.
 
 ---

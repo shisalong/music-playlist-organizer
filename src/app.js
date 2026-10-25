@@ -11,6 +11,7 @@ let playlistGenerator = null;
 const playlist = new DSA.CircularQueue(100);
 const SAVED_PLAYLISTS_STORAGE_KEY = 'genmixSavedPlaylists';
 const SONG_CSV_FILE = 'songs_deduped.csv';
+const SONG_CSV_PATH = `data/${SONG_CSV_FILE}`;
 const RECOMMENDATION_COUNT = 12;
 const LOADING_DURATION_MS = 2500;
 const GENERATION_SAFETY_TIMEOUT_MS = 10000;
@@ -47,7 +48,7 @@ const GENERATOR_FEATURES = [
 // Load the catalog dataset without adding its songs to playback or recommendations.
 async function loadCSVSongs() {
     try {
-        const response = await fetch(SONG_CSV_FILE);
+        const response = await fetch(SONG_CSV_PATH);
         if (!response.ok) {
             throw new Error(`Could not load ${SONG_CSV_FILE}: ${response.status}`);
         }
