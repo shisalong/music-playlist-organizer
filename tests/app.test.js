@@ -1,10 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const DSA = require('./dsa.js');
-const { PlaylistGenerator, MOOD_NAMES, MOOD_PROFILES } = require('./playlistGenerator.js');
-const PlaylistUI = require('./playlistUI.js');
-const PlaylistWizard = require('./playlistWizard.js');
+const DSA = require('../src/core/dsa.js');
+const { PlaylistGenerator, MOOD_NAMES, MOOD_PROFILES } = require('../src/playlist/playlistGenerator.js');
+const PlaylistUI = require('../src/playlist/playlistUI.js');
+const PlaylistWizard = require('../src/playlist/playlistWizard.js');
+const PlaylistEditor = require('../src/playlist/playlistEditor.js');
 
 let passed = 0;
 let failed = 0;
@@ -171,6 +172,7 @@ function createApp(fetchImplementation, localStorage = createMemoryStorage()) {
         PlaylistGenerator,
         PlaylistUI,
         PlaylistWizard,
+        PlaylistEditor,
         MOOD_NAMES,
         MOOD_PROFILES,
         document,
@@ -199,7 +201,7 @@ function createApp(fetchImplementation, localStorage = createMemoryStorage()) {
         Math
     };
     vm.runInNewContext(
-        fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8'),
+        fs.readFileSync(path.join(__dirname, '..', 'src', 'app.js'), 'utf8'),
         context,
         { filename: 'app.js' }
     );
@@ -229,13 +231,10 @@ function csvResponse(csvText) {
     };
 }
 
-// Check that an empty app still guards all playback controls and playlist actions.
-function verifyEmptyPlaybackControls(app) {
-    app.context.playPause();
-    app.context.playNext();
-    app.context.playPrevious();
+// Check that an empty app still guards queue and playlist actions.
+function verifyEmptyQueueControls(app) {
     app.context.shufflePlaylist();
-    assert(app.evaluate('playlist.isEmpty()'), 'Playback controls must leave an empty queue usable');
+    assert(app.evaluate('playlist.isEmpty()'), 'Queue actions must leave an empty queue usable');
     assertEqual(
         app.evaluate('catalogSongs.length'),
         0,
@@ -312,7 +311,7 @@ async function main() {
         app.elements.get('wizardNameInput').value = 'Empty catalog';
         app.elements.get('wizardNameForm').listeners.get('submit')({ preventDefault() {} });
         assert(app.elements.get('wizardSongMethod').disabled, 'Empty catalog options must stay disabled in the wizard');
-        verifyEmptyPlaybackControls(app);
+        verifyEmptyQueueControls(app);
     });
 
     await runTest('failed CSV fetch leaves no fake catalog songs and reports the failure', async () => {
@@ -323,17 +322,17 @@ async function main() {
         assertEqual(app.evaluate('songCatalog.size'), 0, 'Failed load must leave the catalog empty');
         assertEqual(app.evaluate('songIndex.songs.length'), 0, 'Failed load must leave the sorted index empty');
         assert(
-            app.elements.get('libraryStatus').textContent.includes('Could not load songs_cleaned.csv'),
+            app.elements.get('libraryStatus').textContent.includes('Could not load songs_deduped.csv'),
             'Failed load should explain the empty library in Library'
         );
         assert(app.elements.get('wizardSongMethod').disabled, 'Failed CSV load should disable song generation');
         assert(app.elements.get('wizardMoodMethod').disabled, 'Failed CSV load should disable mood generation');
         assert(app.loggedErrors.some((message) => message.includes('network unavailable')), 'Underlying fetch failure should be logged');
-        verifyEmptyPlaybackControls(app);
+        verifyEmptyQueueControls(app);
     });
 
     await runTest('real CSV startup contains only source records and preserves legitimate title collisions', async () => {
-        const csvText = fs.readFileSync(path.join(__dirname, 'songs_cleaned.csv'), 'utf8');
+        const csvText = fs.readFileSync(path.join(__dirname, '..', 'data', 'songs_deduped.csv'), 'utf8');
         const app = createApp(async () => csvResponse(csvText));
         await app.startup();
         const sourceTree = new DSA.BTree();
@@ -342,7 +341,7 @@ async function main() {
             sourceTree.inorderTraversal().map((song) => song.track_id)
         );
         const catalogSongs = app.evaluate('songCatalog.inorderTraversal()');
-        assertEqual(catalogSongs.length, 5000, 'App should retain the existing 5,000-row CSV limit');
+        assertEqual(catalogSongs.length, 4428, 'App should load every unique song in songs_deduped.csv');
         assert(
             catalogSongs.every((song) => sourceIds.has(song.track_id)),
             'Every startup catalog song ID must be present in the source CSV'
@@ -469,7 +468,7 @@ async function main() {
     });
 
     await runTest('saved queue playlists render in Home and Library and persist across app reloads', async () => {
-        const csvText = fs.readFileSync(path.join(__dirname, 'songs_cleaned.csv'), 'utf8');
+        const csvText = fs.readFileSync(path.join(__dirname, '..', 'data', 'songs_deduped.csv'), 'utf8');
         const storage = createMemoryStorage();
         const app = createApp(async () => csvResponse(csvText), storage);
         await app.startup();
@@ -515,7 +514,7 @@ async function main() {
     });
 
     await runTest('generated playlists save once, refresh Home and Library, and persist', async () => {
-        const csvText = fs.readFileSync(path.join(__dirname, 'songs_cleaned.csv'), 'utf8');
+        const csvText = fs.readFileSync(path.join(__dirname, '..', 'data', 'songs_deduped.csv'), 'utf8');
         const storage = createMemoryStorage();
         const existingPlaylist = {
             id: 'preexisting',
@@ -586,8 +585,112 @@ async function main() {
         );
     });
 
+    await runTest('saved playlists with songs missing from the dataset still open and edit', async () => {
+        const csvText = fs.readFileSync(path.join(__dirname, '..', 'data', 'songs_deduped.csv'), 'utf8');
+        const sourceTree = new DSA.BTree();
+        DSA.loadSongsFromCSV(csvText, sourceTree);
+        const realSong = sourceTree.inorderTraversal()[0];
+        const storage = createMemoryStorage();
+        storage.setItem('genmixSavedPlaylists', JSON.stringify([{
+            id: 'legacy',
+            name: 'Legacy Mix',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            songs: [
+                { ...realSong },
+                { track_id: 'removed-from-dataset', title: 'Old Song', artist: 'Old Artist' },
+                null
+            ]
+        }]));
+        const app = createApp(async () => csvResponse(csvText), storage);
+        await app.startup();
+
+        assert(app.context.openPlaylistDetail('legacy'), 'A playlist with missing songs should still open');
+        const rows = app.elements.get('playlistDetailSongs').children;
+        assertEqual(rows.length, 3, 'Every saved entry should still render as a row');
+        assert(!rows[0].classList.contains('playlist-song-missing'), 'A catalog song should not be flagged');
+        assert(rows[1].classList.contains('playlist-song-missing'), 'A song absent from the dataset should be flagged');
+        assert(rows[2].classList.contains('playlist-song-missing'), 'A malformed entry should be flagged, not crash');
+        assert(
+            app.elements.get('playlistDetailCount').textContent.includes('2 not in the current song catalog'),
+            'The header should report how many songs are missing'
+        );
+
+        assert(app.context.removeSongFromOpenPlaylist(1), 'Missing songs should remain removable');
+        const saved = JSON.parse(storage.getItem('genmixSavedPlaylists'))[0];
+        assertEqual(saved.songs.length, 2, 'The removal should persist');
+        assertEqual(saved.songs[0].track_id, realSong.track_id, 'Remaining songs should keep their order');
+    });
+
+    await runTest('Library playlists can be deleted from a card or the detail view and stay deleted', async () => {
+        const csvText = fs.readFileSync(path.join(__dirname, '..', 'data', 'songs_deduped.csv'), 'utf8');
+        const sourceTree = new DSA.BTree();
+        DSA.loadSongsFromCSV(csvText, sourceTree);
+        const [songA, songB] = sourceTree.inorderTraversal();
+        const storage = createMemoryStorage();
+        const makePlaylist = (id, name) => ({
+            id,
+            name,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            songs: [{ ...songA }, { ...songB }]
+        });
+        storage.setItem('genmixSavedPlaylists', JSON.stringify([
+            makePlaylist('keep', 'Keep Me'),
+            makePlaylist('card', 'Delete From Card'),
+            makePlaylist('detail', 'Delete From Detail')
+        ]));
+        const app = createApp(async () => csvResponse(csvText), storage);
+        await app.startup();
+        const savedIds = () => JSON.parse(storage.getItem('genmixSavedPlaylists')).map((saved) => saved.id);
+
+        app.context.switchSection('library');
+        const findCard = (name) => app.elements.get('libraryDisplay').children.find((card) => {
+            return card.children[0].textContent === name;
+        });
+        const card = findCard('Delete From Card');
+        const deleteButton = card.children.find((child) => child.textContent === 'Delete');
+        const confirmation = card.children.find((child) => child.className.includes('saved-playlist-confirm'));
+        assert(deleteButton && confirmation, 'Library cards should offer Delete with a confirmation');
+        assert(confirmation.hidden, 'The confirmation should start hidden');
+
+        deleteButton.click();
+        assert(!confirmation.hidden && deleteButton.hidden, 'Delete should ask for confirmation first');
+        confirmation.children[2].click();
+        assert(confirmation.hidden && !deleteButton.hidden, 'Cancel should close the confirmation');
+        assertEqual(savedIds(), ['keep', 'card', 'detail'], 'Cancel must not delete anything');
+
+        deleteButton.click();
+        confirmation.children[1].click();
+        assertEqual(savedIds(), ['keep', 'detail'], 'Confirming should delete only that playlist');
+        assert(!findCard('Delete From Card'), 'The deleted card should leave the Library');
+        assert(findCard('Keep Me') && findCard('Delete From Detail'), 'Other cards should remain');
+
+        assert(app.context.openPlaylistDetail('detail'), 'The detail view should open');
+        assert(app.context.removeSongFromOpenPlaylist(0), 'A song removal should offer undo');
+        assert(!app.elements.get('undoToast').hidden, 'The undo toast should be visible');
+        app.elements.get('playlistDeleteButton').click();
+        assert(!app.elements.get('playlistDeleteConfirmation').hidden, 'Detail delete should ask for confirmation');
+        app.elements.get('playlistDeleteConfirm').click();
+        assertEqual(savedIds(), ['keep'], 'Confirming in the detail view should delete the open playlist');
+        assertEqual(app.evaluate('activeSection'), 'library', 'Deleting the open playlist should return to the Library');
+        assertEqual(app.evaluate('openPlaylistId'), null, 'No deleted playlist should stay open');
+        assert(app.elements.get('undoToast').hidden, 'A pending undo for the deleted playlist should be dismissed');
+        assertEqual(app.evaluate('pendingUndo'), null, 'The stale undo should be cleared');
+        assert(!app.context.openPlaylistDetail('detail'), 'A deleted playlist should not reopen');
+
+        const reloadedApp = createApp(async () => csvResponse(csvText), storage);
+        await reloadedApp.startup();
+        reloadedApp.context.switchSection('library');
+        const reloadedNames = reloadedApp.elements.get('libraryDisplay').children.map((saved) => saved.children[0].textContent);
+        assertEqual(reloadedNames, ['Keep Me'], 'Deletions should persist across a reload');
+        assertEqual(
+            reloadedApp.elements.get('homePlaylistsDisplay').children.map((saved) => saved.children[0].textContent),
+            ['Keep Me'],
+            'Home should also stop listing deleted playlists'
+        );
+    });
+
     await runTest('Delete discards results and empty or failed generation is recoverable', async () => {
-        const csvText = fs.readFileSync(path.join(__dirname, 'songs_cleaned.csv'), 'utf8');
+        const csvText = fs.readFileSync(path.join(__dirname, '..', 'data', 'songs_deduped.csv'), 'utf8');
         const storage = createMemoryStorage();
         const app = createApp(async () => csvResponse(csvText), storage);
         await app.startup();

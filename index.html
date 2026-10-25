@@ -5,10 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="GenMix is a music catalog and playlist organizer built with data structures and algorithms.">
     <title>GenMix</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+    <!-- Bump the version query after style changes so browsers do not reuse a cached stylesheet. -->
+    <link rel="stylesheet" href="css/styles.css?v=8">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Unbounded:wght@600;700;800&display=swap">
 </head>
 <body>
+    <!-- Decorative drifting streaks; fixed behind the header and main content. -->
+    <div class="bg-streaks" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+    </div>
+
     <!-- Keep the menu button outside the content that blurs when the menu opens. -->
     <button
         id="menuToggle"
@@ -27,7 +44,7 @@
 
     <!-- Keep the brand and catalog search visible in the page header. -->
     <header id="appHeader" class="top-bar">
-        <span class="header-wordmark">GenMix</span>
+        <span class="header-wordmark gradient-text">GenMix</span>
         <div class="search-container">
             <button class="search-btn" type="button" aria-label="Search songs">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -35,8 +52,14 @@
                     <path d="m16 16 4.5 4.5"></path>
                 </svg>
             </button>
-            <input type="text" id="searchInput" class="search-input" placeholder="Search for songs..." onkeyup="searchSongs(event)">
+            <input type="search" id="searchInput" class="search-input" placeholder="Search for songs..." autocomplete="off" aria-label="Search songs">
         </div>
+        <button class="action-btn header-visualizer-btn" type="button" onclick="showVisualizer()" title="Visualizer" aria-label="Open algorithm visualizer">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 19V5M4 19h16"></path>
+                <path d="M8 16v-5m4 5V7m4 9v-8m4 8v-4"></path>
+            </svg>
+        </button>
     </header>
 
     <!-- The overlay receives outside clicks; the menu remains above it. -->
@@ -44,7 +67,6 @@
 
     <!-- The navigation panel stays mounted so its slide transition can finish. -->
     <aside id="mainMenu" class="menu-panel" aria-label="Main menu" aria-hidden="true" inert>
-        <div class="menu-brand">GenMix</div>
         <nav class="sidebar-nav" aria-label="Primary navigation">
             <a href="#homeSection" class="nav-item active" data-section="home" aria-current="page">
                 <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -112,6 +134,7 @@
                                     Save playlist
                                 </button>
                             </div>
+                            <p class="queue-info" id="queueStatus" role="status">Queue: Empty</p>
                         </div>
                         <div id="homePlaylistsDisplay" class="playlist-grid"></div>
                     </section>
@@ -139,11 +162,57 @@
                 <div id="libraryDisplay" class="playlist-grid"></div>
             </section>
 
+            <!-- Playlist Detail Section: opened from a Library card. -->
+            <section id="playlistDetailSection" class="content-section">
+                <div class="playlist-detail">
+                    <div class="playlist-detail-header">
+                        <button id="playlistDetailBack" class="btn-secondary" type="button">← Back to Library</button>
+                        <div class="playlist-detail-heading">
+                            <div id="playlistNameView" class="playlist-name-view">
+                                <h1 id="playlistDetailName"></h1>
+                                <button id="playlistRenameButton" class="btn-secondary btn-small" type="button">Rename</button>
+                            </div>
+                            <form id="playlistRenameForm" class="playlist-rename-form" novalidate hidden>
+                                <label class="visually-hidden" for="playlistRenameInput">Playlist name</label>
+                                <input id="playlistRenameInput" class="playlist-name-input" type="text" maxlength="80" autocomplete="off">
+                                <button class="btn-primary btn-small" type="submit">Save</button>
+                                <button id="playlistRenameCancel" class="btn-secondary btn-small" type="button">Cancel</button>
+                            </form>
+                            <p id="playlistDetailCount" class="saved-playlist-count"></p>
+                        </div>
+                        <div class="playlist-detail-actions">
+                            <!-- FUTURE: "Export to YouTube" button for this playlist goes in this slot. -->
+                            <div id="playlistDetailExportSlot" class="playlist-detail-export-slot"></div>
+                            <button id="playlistAddSongsToggle" class="btn-primary btn-small" type="button" aria-expanded="false" aria-controls="playlistAddPanel">
+                                Add songs
+                            </button>
+                            <button id="playlistDeleteButton" class="btn-secondary btn-small btn-delete" type="button">Delete playlist</button>
+                        </div>
+                    </div>
+                    <div id="playlistDeleteConfirmation" class="wizard-confirmation" hidden>
+                        <span>Delete this playlist? This cannot be undone.</span>
+                        <button id="playlistDeleteConfirm" class="btn-secondary btn-small btn-delete" type="button">Yes, delete</button>
+                        <button id="playlistDeleteCancel" class="btn-secondary btn-small" type="button">Cancel</button>
+                    </div>
+                    <p id="playlistDetailMessage" class="wizard-message" role="status" aria-live="polite"></p>
+
+                    <section id="playlistAddPanel" class="playlist-add-panel" aria-labelledby="playlistAddHeading" hidden>
+                        <h2 id="playlistAddHeading">Add songs</h2>
+                        <label for="playlistAddSearch">Search by song title or artist</label>
+                        <input id="playlistAddSearch" class="generator-input" type="search" placeholder="Type a title or artist" autocomplete="off">
+                        <p id="playlistAddStatus" class="generator-status" aria-live="polite">Enter a title or artist to find songs.</p>
+                        <ul id="playlistAddResults" class="playlist-add-results"></ul>
+                    </section>
+
+                    <ol id="playlistDetailSongs" class="playlist-detail-songs" aria-label="Songs in this playlist"></ol>
+                </div>
+            </section>
+
             <!-- Playlist Generator Section -->
             <section id="generatorSection" class="content-section">
-                <div class="section-header">
+                <div class="section-header generator-header">
                     <div>
-                        <h1>Playlist Generator</h1>
+                        <h1 class="generator-title gradient-text gradient-text--vivid">Playlist Generator</h1>
                         <p class="generator-intro">Build a playlist from a seed song or a mood.</p>
                     </div>
                 </div>
@@ -157,7 +226,6 @@
                     </section>
 
                     <section id="wizardNamePanel" class="wizard-panel" aria-labelledby="wizardNameHeading" hidden>
-                        <p class="wizard-step-indicator">Step 1 of 4</p>
                         <h2 id="wizardNameHeading" tabindex="-1">Name your playlist</h2>
                         <form id="wizardNameForm" novalidate>
                             <label for="wizardNameInput">Playlist name</label>
@@ -171,7 +239,6 @@
                     </section>
 
                     <section id="wizardMethodPanel" class="wizard-panel" aria-labelledby="wizardMethodHeading" hidden>
-                        <p class="wizard-step-indicator">Step 2 of 4</p>
                         <h2 id="wizardMethodHeading" tabindex="-1">Choose how to build it</h2>
                         <p>Playlist name: <strong id="wizardChosenName"></strong></p>
                         <p id="wizardMethodEmptyMessage" class="empty-state" role="status" hidden></p>
@@ -192,7 +259,6 @@
                     </section>
 
                     <section id="wizardSongPanel" class="wizard-panel" aria-labelledby="wizardSongHeading" hidden>
-                        <p class="wizard-step-indicator">Step 3 of 4</p>
                         <h2 id="wizardSongHeading" tabindex="-1">Choose a seed song</h2>
                         <label for="wizardSongSearch">Search by song title or artist</label>
                         <input
@@ -215,7 +281,6 @@
                     </section>
 
                     <section id="wizardMoodPanel" class="wizard-panel" aria-labelledby="wizardMoodHeading" hidden>
-                        <p class="wizard-step-indicator">Step 3 of 4</p>
                         <h2 id="wizardMoodHeading" tabindex="-1">Choose a mood</h2>
                         <div id="wizardMoodOptions" class="wizard-mood-options" role="radiogroup" aria-labelledby="wizardMoodHeading"></div>
                         <div class="wizard-actions">
@@ -233,7 +298,6 @@
                     </section>
 
                     <section id="wizardResultPanel" class="wizard-panel wizard-result-panel" aria-labelledby="wizardResultHeading" hidden>
-                        <p class="wizard-step-indicator">Step 4 of 4</p>
                         <h2 id="wizardResultHeading" tabindex="-1"></h2>
                         <p id="wizardResultSummary" class="generator-status" aria-live="polite"></p>
                         <p id="wizardResultMessage" class="generator-result-message" role="status"></p>
@@ -242,6 +306,9 @@
                         <div id="wizardResultActions" class="wizard-actions">
                             <button id="wizardSaveButton" class="btn-primary" type="button">Save to Library</button>
                             <button id="wizardDeleteButton" class="btn-secondary" type="button">Delete Playlist</button>
+                        </div>
+                        <div id="wizardExportActions" class="wizard-actions">
+                            <button id="wizardYouTubeExport" class="btn-youtube" type="button">Export to YouTube</button>
                         </div>
                         <div id="wizardDeleteConfirmation" class="wizard-confirmation" hidden>
                             <span>Discard this playlist?</span>
@@ -271,60 +338,11 @@
         </div>
     </main>
 
-    <!-- Bottom Player Bar -->
-    <footer class="player-bar" id="playerBar">
-        <div class="player-info">
-            <div class="now-playing-art">
-                <div class="art-placeholder" aria-hidden="true"></div>
-            </div>
-            <div class="now-playing-details">
-                <div id="nowPlayingSong" class="now-playing-title">Not playing</div>
-                <div class="now-playing-artist" id="nowPlayingArtist">-</div>
-            </div>
-            <button class="like-btn" type="button" title="Like" aria-label="Like">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M20.5 8.5c0 5-8.5 11-8.5 11s-8.5-6-8.5-11a4.5 4.5 0 0 1 8.5-2.2 4.5 4.5 0 0 1 8.5 2.2Z"></path>
-                </svg>
-            </button>
-        </div>
-
-        <div class="player-controls">
-            <div class="control-buttons">
-                <button class="control-btn" type="button" onclick="playPrevious()" title="Previous" aria-label="Previous song">
-                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M5 5v14M19 6 8 12l11 6z"></path>
-                    </svg>
-                </button>
-                <button class="control-btn play-btn" id="playPauseBtn" type="button" onclick="playPause()" title="Play/Pause" aria-label="Play or pause">
-                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="m8 5 12 7-12 7z"></path>
-                    </svg>
-                </button>
-                <button class="control-btn" type="button" onclick="playNext()" title="Next" aria-label="Next song">
-                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M19 5v14M5 6l11 6-11 6z"></path>
-                    </svg>
-                </button>
-            </div>
-            <div class="progress-bar-container">
-                <span class="time-current" id="timeCurrent">0:00</span>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill"></div>
-                </div>
-                <span class="time-total" id="timeTotal">0:00</span>
-            </div>
-        </div>
-
-        <div class="player-actions">
-            <div class="queue-info" id="queueStatus">Queue: Empty</div>
-            <button class="action-btn" type="button" onclick="showVisualizer()" title="Visualizer" aria-label="Open algorithm visualizer">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 19V5M4 19h16"></path>
-                    <path d="M8 16v-5m4 5V7m4 9v-8m4 8v-4"></path>
-                </svg>
-            </button>
-        </div>
-    </footer>
+    <!-- Undo toast shown briefly after a song is removed from a playlist. -->
+    <div id="undoToast" class="undo-toast" role="status" aria-live="polite" hidden>
+        <span id="undoToastMessage"></span>
+        <button id="undoToastButton" class="undo-toast-button" type="button">Undo</button>
+    </div>
 
     <!-- Visualizer Modal -->
     <div id="visualizerModal" class="modal">
@@ -341,10 +359,47 @@
         </div>
     </div>
 
-    <script src="dsa.js"></script>
-    <script src="playlistGenerator.js"></script>
-    <script src="playlistUI.js"></script>
-    <script src="playlistWizard.js"></script>
-    <script src="app.js"></script>
+    <!-- Shared confirmation and result panel for generated and saved playlists. -->
+    <div id="youtubeExportModal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="youtubeExportHeading">
+        <div class="modal-content youtube-export-modal-content">
+            <div class="modal-header">
+                <h2 id="youtubeExportHeading">Export to YouTube</h2>
+                <button id="youtubeExportClose" class="modal-close" type="button" aria-label="Close YouTube export">×</button>
+            </div>
+            <div class="modal-body youtube-export-body">
+                <label for="youtubePlaylistName">Playlist name</label>
+                <input id="youtubePlaylistName" class="generator-input" type="text" maxlength="150" autocomplete="off">
+                <label for="youtubePrivacy">YouTube privacy</label>
+                <select id="youtubePrivacy" class="generator-input">
+                    <option value="private" selected>Private</option>
+                    <option value="unlisted">Unlisted</option>
+                    <option value="public">Public</option>
+                </select>
+                <p id="youtubeExportEstimate" class="youtube-export-estimate"></p>
+                <p class="youtube-export-note">You will authorize your own Google account. GenMix keeps the access token in memory only.</p>
+                <p id="youtubeExportStatus" class="wizard-message" role="status" aria-live="polite"></p>
+                <div id="youtubeExportResult" class="youtube-export-result"></div>
+                <div class="wizard-actions">
+                    <button id="youtubeExportStart" class="btn-youtube" type="button">Authorize and Export</button>
+                    <button id="youtubeExportCancel" class="btn-secondary" type="button">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.local.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="src/core/dsa.js"></script>
+    <script src="src/playlist/playlistGenerator.js"></script>
+    <script src="src/playlist/playlistUI.js"></script>
+    <script src="src/playlist/playlistWizard.js"></script>
+    <script src="src/playlist/playlistEditor.js"></script>
+    <script src="src/integrations/youtube/youtubeMatcher.js"></script>
+    <script src="src/integrations/youtube/youtubeCache.js"></script>
+    <script src="src/integrations/youtube/youtubeAuth.js"></script>
+    <script src="src/integrations/youtube/youtubeApi.js"></script>
+    <script src="src/integrations/youtube/youtubeExporter.js"></script>
+    <script src="src/integrations/youtube/youtubeUI.js"></script>
+    <script src="src/app.js"></script>
 </body>
 </html>

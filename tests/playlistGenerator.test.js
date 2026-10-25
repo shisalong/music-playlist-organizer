@@ -8,14 +8,14 @@ const {
     hasValidFeatures,
     computeSimilarity,
     loadSongsFromCSV
-} = require('./dsa.js');
+} = require('../src/core/dsa.js');
 const {
     PLAYLIST_SIZE,
     MOOD_NAMES,
     MOOD_PROFILES,
     shuffleSongs,
     PlaylistGenerator
-} = require('./playlistGenerator.js');
+} = require('../src/playlist/playlistGenerator.js');
 
 let passed = 0;
 let failed = 0;
@@ -446,7 +446,7 @@ runTest('5,000-song synthetic mood playlists remain bounded and correctly filter
     }
 });
 
-const csvPath = path.join(__dirname, 'songs_cleaned.csv');
+const csvPath = path.join(__dirname, '..', 'data', 'songs_deduped.csv');
 const csvText = fs.readFileSync(csvPath, 'utf8');
 const csvCatalog = new BTree();
 const csvLoadStats = loadSongsFromCSV(csvText, csvCatalog);
@@ -467,7 +467,7 @@ runTest('real CSV seed playlist returns 19 unique songs from the CSV catalog', (
 });
 
 runTest('real CSV mood counts are printed and playlists stay within 20', () => {
-    assertEqual(csvLoadStats.songsInserted, 5000, 'Real CSV fixture should use the existing 5,000-song limit');
+    assertEqual(csvLoadStats.songsInserted, 4428, 'Real CSV fixture should load every unique song in songs_deduped.csv');
     for (const moodName of MOOD_NAMES) {
         const matchingSongs = csvGenerator.getMatchingSongs(moodName);
         const result = csvGenerator.generateFromMood(moodName, {

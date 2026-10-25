@@ -10,7 +10,7 @@ const {
     computeSimilarity,
     SongGraph,
     loadSongsFromCSV
-} = require('./dsa.js');
+} = require('../src/core/dsa.js');
 
 let passed = 0;
 let failed = 0;
@@ -303,12 +303,12 @@ runTest('stores at most k edges per node on a deterministic 5,000-song set', () 
 });
 
 runTest('builds a sparse graph from the real CSV dataset', () => {
-    const csvPath = path.join(__dirname, 'songs_cleaned.csv');
+    const csvPath = path.join(__dirname, '..', 'data', 'songs_deduped.csv');
     const csvText = fs.readFileSync(csvPath, 'utf8');
     const tree = new BTree();
     const loadStats = loadSongsFromCSV(csvText, tree);
     const graph = makeGraph(tree.inorderTraversal());
-    assertEqual(loadStats.songsInserted, SONG_LIMIT, 'Loader should insert its existing 5,000-row limit');
+    assertEqual(loadStats.songsInserted, 4428, 'Loader should insert every unique song in songs_deduped.csv');
     assertEqual(graph.nodeCount(), tree.size, 'Every valid CSV song should be represented');
     assertEqual(graph.edgeCount(), graph.nodeCount() * NEIGHBOR_COUNT, 'CSV graph should retain only k outgoing edges per node');
     assertEqual(graph.skippedSongs.length, 0, 'CSV loader output should have five numeric features per song');

@@ -4,8 +4,10 @@
   "description": "GenMix demonstrates DSA algorithms - B-Tree, Circular Queue, and Priority Queue",
   "main": "index.html",
   "scripts": {
-    "dev": "npx http-server . -p 3000 -o",
-    "start": "npm run dev"
+    "config": "node scripts/generate-config.js",
+    "dev": "npm run config && http-server . -p 3010 -o -c-1",
+    "start": "npm run dev",
+    "test": "node tests/btree.test.js && node tests/graph.test.js && node tests/playlistGenerator.test.js && node tests/playlistUI.test.js && node tests/playlistWizard.test.js && node tests/playlistEditor.test.js && node tests/app.test.js && node tests/youtube/youtubeMatcher.test.js && node tests/youtube/youtubeAuth.test.js && node tests/youtube/youtubeExporter.test.js"
   },
   "keywords": ["DSA", "music", "playlist", "algorithms", "data-structures"],
   "author": "",
